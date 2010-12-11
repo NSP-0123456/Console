@@ -1,0 +1,144 @@
+Console Plugin   version 1.0.0
+
+Copyright (C) 2003 Artur Dorochowicz
+All Rights Reserved.
+
+TABLE OF CONTENTS
+--------------------------------------------------------------------------------
+1. Overview
+2. Legal stuff
+3. Installation
+4. Services
+5. Plugin usage
+6. History
+7. Contacting the author
+--------------------------------------------------------------------------------
+
+1. OVERVIEW
+--------------------------------------------------------------------------------
+Console  Plugin creates  a console  window where  user can  run other   plugins'
+services, see their return values, check and set variables and operate on flags.
+It can be a very helpful tool during plugin development.
+
+The plugin was tested with PowerPro 3.8
+
+2. LEGAL STUFF
+--------------------------------------------------------------------------------
+This is a  freeware  program. You  may distribute  it  freely, but  you must not
+request or  accept any  amount of money  or other  payment for it.  You must not
+change this program's contents  in any way. And, by  the way, you use it at your
+own risk.  Distribution is fully  allowed as  long as the plugin  (i.e. plugin's
+.dll file and  this .txt info  file) remain  unchanged. When  distributing, both
+plugin files (.dll and .txt) must be included.
+
+All used names are the property of their respective owners.
+PowerPro and plugin template are Copyright (C) by Bruce Switzer.
+
+3. INSTALLATION
+--------------------------------------------------------------------------------
+In order to  use the  plugin, you  should place  it in  your PowerPro  'plugins'
+directory.  If you do not have  'plugins'  directory,  you  probably  have older
+version of PowerPro.  In this case place the plugin  directly  in your  PowerPro
+directory. After that you can use its services just like services from any other
+plugin. Read PowerPro's help for general information on using plugins.
+
+4. SERVICES
+--------------------------------------------------------------------------------
+show ()
+        Creates a console window. Only one  console window can exist  at a  time
+        and thus  when a  console window  is shown,  consecutive calls to show()
+        service  are ignored.
+
+close ()
+        Closes a console window. This  operation deletes all information in  the
+        console window, which means that next call to show() service will create
+        a completely  new console  window: empty,  with no  watches set, with no
+        information about previously used commands.
+
+Plugin's services do not take any arguments, so you do not have to use brackets.
+
+5. PLUGIN USAGE
+--------------------------------------------------------------------------------
+When the console is shown, the following commands can be used:
+
+exit
+        Closes console window. Works like close() service.
+
+set
+        Sets the value of the variable.
+        Syntax:
+               set variablename value
+
+        'value' argument can be omitted and than the variable is cleared.
+        Names of variables cannot be longer than 63 characters.
+
+get
+        Returns the value of the variable.
+        Syntax:
+               get variablename
+
+        Names of variables cannot be longer than 63 characters.
+	'Get' cannot be used to check values of PowerPro keywords.       
+
+flag
+        Performs operations on flags.
+        Syntax:
+               flag set n1 n2
+               flag clear n1 n2
+               flag reverse n1 n2
+        This commands will set or clear or toggle flags of numbers from n1 to n2.
+        'n2' argument can be omitted.
+
+watch1, ..., watch5
+        Sets watches at positions from 1 to 5.
+        Syntax:
+               watch1 variablename
+
+        This command sets watch 1 to 'variablename'.
+        Names of variables cannot be longer than 63 characters.
+
+	Watches for PowerPro keywords are not supported.
+
+won
+        Turnes watches on.
+        Syntax:
+               won interval
+
+        'interval' argument specifies the  interval in seconds between  checking
+        variables on the watch list. If  it  is  omitted then  the deafult value
+        of 3 seconds is used.
+        Below the list of watches, there is a list with all PowerPro flags shown
+        with this format: flagnumber(state)
+
+woff
+        Turnes watches off.
+
+Any other commands are send to PowerPro for evaluation.
+Through evaluation you can do the following:
+
+- run services from plugins and get their return values:
+        plugin.service(arguments...)
+
+- get values of PowerPro keywords:
+        e.g. pprofolder, pproversion, date, time and so on.
+
+- get status of PowerPro flags:
+        pproflag(flag number)
+
+- get values of regular PowerPro variables, it then works like 'get' command.
+
+You can use up and down arrows to cycle through the list of previous commands.
+
+Unloading  Console Plugin  from within  a console  window is  not supported  and
+command: console.unload is ignored.
+
+6. HISTORY
+--------------------------------------------------------------------------------
+v. 1.0.0
+   - first public release
+
+7. CONTACTING THE AUTHOR
+--------------------------------------------------------------------------------
+All comments, feature requests, bug reports are welcome and greatly appreciated.
+
+Mail to: Artur Dorochowicz <x-phile@wp.pl> or use PowerPro group.

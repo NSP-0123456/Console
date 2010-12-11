@@ -1,0 +1,39 @@
+#include <windows.h>
+
+#include "Resources.h"
+
+IDB_CLOSE	BITMAP "close.bmp"
+IDB_MINIMIZE	BITMAP "minimize.bmp"
+
+// English (U.K.) resources
+#ifdef _WIN32
+LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_UK
+#endif
+
+VS_VERSION_INFO VERSIONINFO
+FILEVERSION     1,0,0,0
+PRODUCTVERSION  1,0,0,0
+FILEFLAGSMASK   VS_FFI_FILEFLAGSMASK
+FILEOS          VOS__WINDOWS32
+FILETYPE        VFT_DLL
+FILESUBTYPE     VFT2_UNKNOWN
+BEGIN
+  BLOCK "StringFileInfo"
+  BEGIN
+    BLOCK "080904b0"
+    BEGIN
+      VALUE "CompanyName",      "x-phile"
+      VALUE "FileDescription",  "Console Plugin"
+      VALUE "FileVersion",      "1.0.0"
+      VALUE "InternalName",     "Console Plugin"
+      VALUE "LegalCopyright",   "Copyright © 2003 Artur Dorochowicz"    
+      VALUE "OriginalFilename", "Console.dll"
+      VALUE "ProductName",      "Console Plugin"
+      VALUE "ProductVersion",   "1.0.0"
+    END
+  END
+  BLOCK "VarFileInfo"
+  BEGIN
+    VALUE "Translation", 0x809, 0x4b0
+  END
+END

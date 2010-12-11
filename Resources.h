@@ -1,0 +1,2 @@
+#define IDB_CLOSE	1000
+#define IDB_MINIMIZE	1010
