@@ -1,35 +1,44 @@
-Console Plugin   version 1.0.2
+Console Plugin   version 1.0.3
 
-Copyright (C) 2003 Artur Dorochowicz
-All Rights Reserved.
+Copyright (C) 2003-2004 Artur Dorochowicz
+All rights reserved.
 
 TABLE OF CONTENTS
 --------------------------------------------------------------------------------
 1. Overview
-2. Legal stuff
+2. Licence
 3. Installation
 4. Services
-5. Plugin usage
-6. History
-7. Contacting the author
+5. Configuration file format
+6. Plugin usage
+7. History
+8. Contacting the author
 --------------------------------------------------------------------------------
 
 1. OVERVIEW
 --------------------------------------------------------------------------------
 Console  Plugin creates  a console  window where  user can  run other   plugins'
-services, see their return values, check and set variables and operate on flags.
+services, see what they return, check and set variables and operate on flags.
 It can be a very helpful tool during plugin development.
 
-The plugin was tested with PowerPro 3.8
+The plugin has been tested with PowerPro versions: 3.8 and higher.
 
-2. LEGAL STUFF
+2. LICENCE
 --------------------------------------------------------------------------------
-This is a  freeware  program. You  may distribute  it  freely, but  you must not
-request or  accept any  amount of money  or other  payment for it.  You must not
-change this program's contents  in any way. And, by  the way, you use it at your
-own risk.  Distribution is fully  allowed as  long as the plugin  (i.e. plugin's
-.dll file and  this .txt info  file) remain  unchanged. When  distributing, both
-plugin files (.dll and .txt) must be included.
+This is  a freeware  program. You  may distribute  it freely,  but you  must not
+request  or   accept any   amount  of money   or  other payment for it.
+
+This program is distributed in the hope that it will be useful,  but without any
+warranty.  Without even the implied warranty of merchantability or fitness for a
+particular purpose.
+
+Console Plugin consists of the following files:
+   Console.dll   - plugin's dll file
+   Console.txt   - this readme file
+   Console.ini   - example configuration file 
+
+Redistribution is fully allowed as long  as all of the above files  are included
+and remain  unchanged.
 
 All used names are the property of their respective owners.
 PowerPro and plugin template are Copyright (C) by Bruce Switzer.
@@ -42,42 +51,69 @@ version of PowerPro.  In this case place the plugin  directly  in your  PowerPro
 directory. After that you can use its services just like services from any other
 plugin. Read PowerPro's help for general information on using plugins.
 
-The plugin requires Courier New font to be installed in the system.
-
 4. SERVICES
 --------------------------------------------------------------------------------
-show ()
+show ("path_to_ini_file")
         Creates a console window. Only one  console window can exist  at a  time
-        and thus  when a  console window  is shown,  consecutive calls to show()
+        and thus, when a  console window  is shown,  consecutive calls to show()
         service  are ignored.
+        Argument  "path_to_ini_file"  specifies  text file   with  settings  for
+        the plugin.   This argument  can be  omitted and  then the  plugin  uses
+        its  hardcoded   defaults.   See   below   for   more   information   on
+        the configuration file.
 
 close ()
-        Closes a console window. This  operation deletes all information in  the
+        Closes the console window. This operation deletes all information in the
         console window, which means that next call to show() service will create
         a completely  new console  window: empty,  with no  watches set, with no
-        information about previously used commands.
+        information on previously used commands.
 
 execute ("command")
-        Executes "command" on  the console. Console  window is opened  if it was
-        closed.  All double quote  characters in "command"  must be preceded  by
-        an escape character, e.g. console.execute("win.handle('"PowerPro*'")")
+        Executes "command" on the console.  Console  window will be opened if it
+        is closed.  All double quote characters in  "command"  must  be preceded
+        by an escape character, e.g.
+        console.execute("win.handle('"PowerPro*'")")
 
 print ("command")
         Prints "command" on the console replacing current command line.  Console
-        window  is opened   if it   was closed.   All double  quote   characters
-        in "command"     must   be    preceded   by     an   escape   character,
+        will be  opened if  it is  closed.   All  double  quote    characters in
+        "command"     must    be    preceded    by     an    escape   character,
         e.g. console.print("win.handle('"PowerPro*'")")
         
 append ("command")
-        Prints  "command" on  the console  appending it  to the  end of  current
-        command line.   Console window   is opened    if it   was closed.    All
-        double  quote    characters   in   "command"     must    be     preceded
-        by an escape character, e.g. console.append("win.handle('"PowerPro*'")")
+        Prints  "command" on  the console appending it to the end of the current
+        command line. Console window will be opened if it is closed.  All double
+        quote characters in "command"  must be preceded  by an escape  character,
+        e.g. console.append("win.handle('"PowerPro*'")")
 
-Plugin's  services that  do not  take any  arguments,  can  also be used without
-brackets.
+Services that  do not  take any  arguments,  can  also be used without brackets.
 
-5. PLUGIN USAGE
+5. CONFIGURATION FILE FORMAT
+--------------------------------------------------------------------------------
+Configuration file let you customize the  look of the console window. Its syntax
+is similar to that of regular INI files. Every line starting with a semicolon is
+treated as a comment. Section names must be put in square brackets. 
+
+In the current version the file can have these sections and settings:
+FontSettings - section
+   Name - name of the font, it  must be put in double quotes
+   Size  - size of the font
+   Bold - 1 - bold font, 0 - normal font
+   
+Appearance - section
+   Prompt - string used as prompt, it must be put in double quotes
+   CopyrightNote - controls showing copyright note, 0 - do not show, 1 - show
+   Height - height of console window
+   Width - width of console window
+   Resizable - controls whether the window is resizable, 0 - not resizable, 1 - resizable
+   Left - initial vertical position of the window
+   Top - initial horizontal position of the window
+
+For every setting  which is not  present in the  configuration file, the  plugin
+uses its  hardcoded default   value. Hence there  is  no  need to include  every
+setting in the ini file.
+
+6. PLUGIN USAGE
 --------------------------------------------------------------------------------
 When the console is shown, the following commands can be used:
 
@@ -89,7 +125,7 @@ set
         Syntax:
                set variablename value
 
-        'value' argument can be omitted and than the variable is cleared.
+        'value' argument can be omitted and then the variable is cleared.
         Names of variables cannot be longer than 63 characters.
 
 get
@@ -127,16 +163,16 @@ won
         'interval' argument specifies the  interval in seconds between  checking
         variables on the watch list. If  it  is  omitted then  the deafult value
         of 3 seconds is used.
-        Below the list of watches, there is a list with all PowerPro flags shown
+        Below the list of watches,  there  is a list of all PowerPro flags shown
         with this format: flagnumber(state)
 
 woff
         Turnes watches off.
 
-Any other commands are send to PowerPro for evaluation.
+All other commands are send to PowerPro for evaluation.
 Through evaluation you can do the following:
 
-- run services from plugins and get their return values:
+- run services from other plugins and get their return values:
         plugin.service(arguments...)
 
 - get values of PowerPro keywords:
@@ -147,20 +183,22 @@ Through evaluation you can do the following:
 
 - get values of regular PowerPro variables, it then works like 'get' command.
 
-Bad side of  evaluation is the  fact that PowerPro  shows error window  when you
-make a mistake. Maybe some later version of the plugin will close those  windows
-automatically.
 
-You can use up and down arrows to cycle through the list of previous commands.
+Up and down arrows can be used to cycle through the list of previous commands.
 
 USING CONSOLE  PLUGIN SERVICES  FROM WITHIN  A CONSOLE  WINDOW IS NOT SUPPORTED.
 Commands which would  invoke Console Plugin  services are not  processed by  the
-plugin. But you can still rename Console.dll  to some other name and than try to
-use this new one's services from within its console window.  DO NOT DO THIS!  It
-may crash PowerPro!
+plugin. However, you can still rename  Console.dll  to some other name and  then
+try to use this  new one's services from  within its console window.   DO NOT DO
+THIS!  It may crash PowerPro!
 
-6. HISTORY
+7. HISTORY
 --------------------------------------------------------------------------------
+v. 1.0.3   (6 March 2004)
+   - 'show' service changed, it can now read settings from ini file
+   - console window is now customizable
+   - few minor bugs fixed
+
 v. 1.0.2
    - support for copy, cut and paste on the command line
    - more power to command line editing  - sorry that this was not in  the first
@@ -177,7 +215,7 @@ v. 1.0.1
 v. 1.0.0
    - first public release
 
-7. CONTACTING THE AUTHOR
+8. CONTACTING THE AUTHOR
 --------------------------------------------------------------------------------
 All comments, feature requests, bug reports are welcome and greatly appreciated.
 

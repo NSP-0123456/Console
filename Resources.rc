@@ -1,9 +1,18 @@
+/*
+  Console Plugin
+
+  Copyright (C) 2003-2004 Artur Dorochowicz
+  All Rights Reserved.
+*/
+
 #include <windows.h>
 
-#include "Resources.h"
+#include "resources.h"
+#include "version.h"
 
 IDB_CLOSE	BITMAP "close.bmp"
 IDB_MINIMIZE	BITMAP "minimize.bmp"
+IDB_TITLE_BAR	BITMAP "title_bar.bmp"
 
 // English (U.K.) resources
 #ifdef _WIN32
@@ -11,8 +20,8 @@ LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_UK
 #endif
 
 VS_VERSION_INFO VERSIONINFO
-FILEVERSION     1,0,2,0
-PRODUCTVERSION  1,0,2,0
+FILEVERSION     CONSOLE_MAJOR_VERSION,CONSOLE_MINOR_VERSION,CONSOLE_REVISION,0
+PRODUCTVERSION  CONSOLE_MAJOR_VERSION,CONSOLE_MINOR_VERSION,CONSOLE_REVISION,0
 FILEFLAGSMASK   VS_FFI_FILEFLAGSMASK
 FILEOS          VOS__WINDOWS32
 FILETYPE        VFT_DLL
@@ -24,12 +33,12 @@ BEGIN
     BEGIN
       VALUE "CompanyName",      "x-phile"
       VALUE "FileDescription",  "Console Plugin"
-      VALUE "FileVersion",      "1.0.2"
+      VALUE "FileVersion",      CONSOLE_VERSION
       VALUE "InternalName",     "Console Plugin"
-      VALUE "LegalCopyright",   "Copyright © 2003 Artur Dorochowicz"    
+      VALUE "LegalCopyright",   "Copyright © 2003-2004 Artur Dorochowicz"    
       VALUE "OriginalFilename", "Console.dll"
       VALUE "ProductName",      "Console Plugin"
-      VALUE "ProductVersion",   "1.0.2"
+      VALUE "ProductVersion",   CONSOLE_VERSION
     END
   END
   BLOCK "VarFileInfo"
