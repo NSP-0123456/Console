@@ -1,4 +1,4 @@
-Console Plugin   version 1.0.1
+Console Plugin   version 1.0.2
 
 Copyright (C) 2003 Artur Dorochowicz
 All Rights Reserved.
@@ -42,6 +42,8 @@ version of PowerPro.  In this case place the plugin  directly  in your  PowerPro
 directory. After that you can use its services just like services from any other
 plugin. Read PowerPro's help for general information on using plugins.
 
+The plugin requires Courier New font to be installed in the system.
+
 4. SERVICES
 --------------------------------------------------------------------------------
 show ()
@@ -55,7 +57,25 @@ close ()
         a completely  new console  window: empty,  with no  watches set, with no
         information about previously used commands.
 
-Plugin's services do not take any arguments, so you do not have to use brackets.
+execute ("command")
+        Executes "command" on  the console. Console  window is opened  if it was
+        closed.  All double quote  characters in "command"  must be preceded  by
+        an escape character, e.g. console.execute("win.handle('"PowerPro*'")")
+
+print ("command")
+        Prints "command" on the console replacing current command line.  Console
+        window  is opened   if it   was closed.   All double  quote   characters
+        in "command"     must   be    preceded   by     an   escape   character,
+        e.g. console.print("win.handle('"PowerPro*'")")
+        
+append ("command")
+        Prints  "command" on  the console  appending it  to the  end of  current
+        command line.   Console window   is opened    if it   was closed.    All
+        double  quote    characters   in   "command"     must    be     preceded
+        by an escape character, e.g. console.append("win.handle('"PowerPro*'")")
+
+Plugin's  services that  do not  take any  arguments,  can  also be used without
+brackets.
 
 5. PLUGIN USAGE
 --------------------------------------------------------------------------------
@@ -78,7 +98,7 @@ get
                get variablename
 
         Names of variables cannot be longer than 63 characters.
-	'Get' cannot be used to check values of PowerPro keywords.       
+        'Get' cannot be used to check values of PowerPro keywords.
 
 flag
         Performs operations on flags.
@@ -97,7 +117,7 @@ watch1, ..., watch5
         This command sets watch 1 to 'variablename'.
         Names of variables cannot be longer than 63 characters.
 
-	Watches for PowerPro keywords are not supported.
+        Watches for PowerPro keywords are not supported.
 
 won
         Turnes watches on.
@@ -127,18 +147,32 @@ Through evaluation you can do the following:
 
 - get values of regular PowerPro variables, it then works like 'get' command.
 
+Bad side of  evaluation is the  fact that PowerPro  shows error window  when you
+make a mistake. Maybe some later version of the plugin will close those  windows
+automatically.
+
 You can use up and down arrows to cycle through the list of previous commands.
 
-Unloading  Console Plugin  from within  a console  window is  not supported  and
-command: console.unload is ignored.
+USING CONSOLE  PLUGIN SERVICES  FROM WITHIN  A CONSOLE  WINDOW IS NOT SUPPORTED.
+Commands which would  invoke Console Plugin  services are not  processed by  the
+plugin. But you can still rename Console.dll  to some other name and than try to
+use this new one's services from within its console window.  DO NOT DO THIS!  It
+may crash PowerPro!
 
 6. HISTORY
 --------------------------------------------------------------------------------
+v. 1.0.2
+   - support for copy, cut and paste on the command line
+   - more power to command line editing  - sorry that this was not in  the first
+     release
+   - fixed errors which occured on Windows 98
+   - added 'execute', 'print' and 'append' services, see description above
+
 v. 1.0.1
-   - fixed: when started from a menu, the console window did not get focus.
+   - fixed: when started from a menu, the console window did not get focus
    - fixed: 'console.show' returned with error: "Error! RegisterClass() error."
             when issued after closing console window other way than using 'exit'
-            command or 'console.unload' or clicking close button.
+            command or 'console.unload' or clicking close button
 
 v. 1.0.0
    - first public release

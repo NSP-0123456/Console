@@ -1,5 +1,5 @@
 /*
-  Console Plugin   version 1.0.1
+  Console Plugin   version 1.0.2
 
   Copyright (C) 2003 Artur Dorochowicz
   All Rights Reserved.
@@ -15,7 +15,7 @@
 #include "Resources.h"
 
 //---DEFINITIONS----------------------------------------------------------------
-#define LAST_COMMANDS_COUNT	11
+#define PREVIOUS_COMMANDS_COUNT	11
 #define WATCHES_COUNT		5
 #define MAX_VAR_LENGTH		63
 #define MAX_LENGTH		531
@@ -27,6 +27,9 @@
 #define ID_EXITBTN		220
 #define ID_MINIMIZEBTN		230
 #define IDT_TIMER		300
+#define ACTION_EXECUTE		1
+#define ACTION_PRINT		2
+#define ACTION_APPEND		3
 
 //------------------------------------------------------------------------------
 typedef struct tagPProServices
@@ -54,6 +57,10 @@ typedef struct tagPProServices
   } PPROSERVICES;
 
 //---GLOBAL VARIABLES-----------------------------------------------------------
+const PSTR	szWindowClass = "Console Plugin 1.0.2";	// the main window class name
+const PSTR	szTitle = "Console";		// The title bar text
+const unsigned char	prompt [] = "?>";	// prompt
+
 static HWND 	g_hwndPowerPro;		// PowerPro hidden control window handle
 HINSTANCE 	hInst;			// current instance
 PPROSERVICES * PProServices;
@@ -62,39 +69,43 @@ HWND	hEdit; 				// edit control window handle
 HWND	hWatch;				// watch window handle
 HWND	hExitBtn;			// exit button handle
 HWND	hMinimizeBtn;			// minimize button handle
-HFONT	hFont = NULL;			// Courier New font handle
-HBITMAP hbClose = NULL;			// handle of bitmap on close button
-HBITMAP hbMinimize = NULL;		// handle of bitmap on minimize button
-int	linenum = 0;			// stores line number of currently shown line
-int	linenumfornext = 0;		// stores line number for saving next line
-int	position = 0;			// length of current command line
-int	interval = 0;			// interval in seconds between consecutive probing of variables in the watch list
-BOOL	bReading = FALSE;		// true if waiting for user input
+HFONT	hFont;				// Courier New font handle
+HBITMAP hbClose;			// handle of bitmap on close button
+HBITMAP hbMinimize;			// handle of bitmap on minimize button
+BOOL	bReading;			// true if waiting for user input
 WNDPROC	OrigEditWndProc;		// original window procedure of edit control
-PSTR	szTitle = "Console";		// The title bar text
-PSTR	szWindowClass = "Console Plugin";	// the main window class name
-unsigned char	prompt [] = "?>";		// prompt
-unsigned char	* cmdline;			// command line
-unsigned char	* cmdresult;			// result of evaluation from PowerPro
-unsigned char	* variablename;			// stores names of variables
-unsigned char	* cmdlinetemp;			// stores cmdline for temporary use
-unsigned char	** watches;			// stores variables to watch
-unsigned char	** lastcmdlines;		// stores previous command lines
+unsigned char * cmdline;		// command line
+unsigned char * cmdresult;		// result of evaluation from PowerPro
+unsigned char * variablename;		// stores names of variables
+unsigned char * cmdlinetemp;		// stores cmdline for temporary use
+unsigned char * editboxtext;		// buffer for edit box text
+unsigned char ** watches;		// stores variables to watch
+unsigned char ** previous_commands;	// stores previous command lines
+int cmd_line_start;			// index of first character of current command line
+int linenum;				// stores line number of currently shown line
+int linenumfornext;			// stores line number for saving next line
+int interval;				// interval in seconds between consecutive probing of variables in the watch list
+int buffer_size;			// size of buffer storing contents of edit box
 
 //---DECLARATIONS---------------------------------------------------------------
 LRESULT CALLBACK	WndProc(HWND, UINT, WPARAM, LPARAM);
 LRESULT CALLBACK	EditWndProc(HWND, UINT, WPARAM, LPARAM);
 void			WritePrompt (HWND);
-void			WriteText (HWND, unsigned char *);
+void			WriteText (HWND, const unsigned char *);
 int			IncreaseLineNum (int number);
 int			DecreaseLineNum (int number);
 BOOL			AllocateMemory (void);
 void			FreeMemory (void);
 void			WriteWelcomeMessage (HWND);
-BOOL			IsKeyword (unsigned char *);
+BOOL			IsKeyword (const unsigned char *);
 unsigned char *		GetNextCommand (void);
 unsigned char *		GetPreviousCommand (void);
-void			AddCommandToList (unsigned char *);
+void			AddCommandToList (const unsigned char *);
+int			GetPosition (HWND);
+void			MoveCaretToEnd (HWND);
+void			GetCmdLine (HWND, int, char * );
+void			DeleteCmdLine (HWND, int);
+void			MakeAction (int action, LPSTR szv, LPSTR szx, BOOL (*GetVar)(LPSTR, LPSTR), void (*SetVar)(LPSTR, LPSTR), DWORD * pFlags, UINT nargs, LPSTR * szargs, PPROSERVICES * ppsv);
 
 //---DEFINITIONS----------------------------------------------------------------
 BOOL WINAPI DllMain (HINSTANCE hinstDLL, DWORD dwReason, LPVOID lpvReserved)
@@ -122,7 +133,7 @@ BOOL WINAPI DllMain (HINSTANCE hinstDLL, DWORD dwReason, LPVOID lpvReserved)
 //------------------------------------------------------------------------------
 _declspec(dllexport) void show (LPSTR szv, LPSTR szx, BOOL (*GetVar)(LPSTR, LPSTR), void (*SetVar)(LPSTR, LPSTR), DWORD * pFlags, UINT nargs, LPSTR * szargs, PPROSERVICES * ppsv)
 {
-	WNDCLASSEX wcex;
+	WNDCLASS wc;
 	HDC hdc;
 	HWND oldhWnd;
 
@@ -130,11 +141,17 @@ _declspec(dllexport) void show (LPSTR szv, LPSTR szx, BOOL (*GetVar)(LPSTR, LPST
 	PProServices = ppsv;
 
 	oldhWnd = FindWindow(szWindowClass,NULL);
-	if (oldhWnd) return;
+	if (oldhWnd != NULL) return;
+
+	bReading = FALSE;
+	linenum = 0;
+	linenumfornext = 0;
+	interval = 0;
+	buffer_size = 100000;
 
         hbClose = LoadBitmap (hInst, MAKEINTRESOURCE(IDB_CLOSE));
 	hbMinimize = LoadBitmap (hInst, MAKEINTRESOURCE(IDB_MINIMIZE));
-	
+
         if (AllocateMemory() == FALSE)
         {
         	ppsv->ErrMessage("Error! Cannot allocate memory.", NULL);
@@ -142,21 +159,18 @@ _declspec(dllexport) void show (LPSTR szv, LPSTR szx, BOOL (*GetVar)(LPSTR, LPST
         	return;
         }
 
-	wcex.cbSize = sizeof(WNDCLASSEX);
+	wc.style		= CS_HREDRAW | CS_VREDRAW;
+	wc.lpfnWndProc		= (WNDPROC)WndProc;
+	wc.cbClsExtra		= 0;
+	wc.cbWndExtra		= 0;
+	wc.hInstance		= hInst;
+	wc.hIcon		= LoadIcon (NULL, IDI_APPLICATION);
+	wc.hCursor		= LoadCursor (NULL, IDC_ARROW);
+	wc.hbrBackground	= CreateSolidBrush (RGB(236, 233, 216));
+	wc.lpszMenuName		= NULL;
+	wc.lpszClassName	= szWindowClass;
 
-	wcex.style		= CS_HREDRAW | CS_VREDRAW;
-	wcex.lpfnWndProc	= (WNDPROC)WndProc;
-	wcex.cbClsExtra		= 0;
-	wcex.cbWndExtra		= 0;
-	wcex.hInstance		= hInst;
-	wcex.hIcon		= LoadIcon(NULL, (LPCTSTR)IDI_APPLICATION);
-	wcex.hCursor		= LoadCursor(NULL, IDC_ARROW);
-	wcex.hbrBackground	= (HBRUSH) (COLOR_BTNFACE + 1);
-	wcex.lpszMenuName	= (LPCTSTR) NULL;
-	wcex.lpszClassName	= szWindowClass;
-	wcex.hIconSm		= LoadIcon(NULL, (LPCTSTR)IDI_APPLICATION);
-
-	if (!RegisterClassEx(&wcex))
+	if (!RegisterClass(&wc))
 	{
 		ppsv->ErrMessage("Error! RegisterClass() error.", NULL);
 		FreeMemory();
@@ -201,6 +215,67 @@ _declspec(dllexport) void close (LPSTR szv, LPSTR szx, BOOL (*GetVar)(LPSTR, LPS
 }
 
 //------------------------------------------------------------------------------
+_declspec(dllexport) void execute (LPSTR szv, LPSTR szx, BOOL (*GetVar)(LPSTR, LPSTR), void (*SetVar)(LPSTR, LPSTR), DWORD * pFlags, UINT nargs, LPSTR * szargs, PPROSERVICES * ppsv)
+{
+	MakeAction (ACTION_EXECUTE, szv, szx, GetVar, SetVar, pFlags, nargs, szargs, ppsv);
+}
+
+//------------------------------------------------------------------------------
+_declspec(dllexport) void print (LPSTR szv, LPSTR szx, BOOL (*GetVar)(LPSTR, LPSTR), void (*SetVar)(LPSTR, LPSTR), DWORD * pFlags, UINT nargs, LPSTR * szargs, PPROSERVICES * ppsv)
+{
+	MakeAction (ACTION_PRINT, szv, szx, GetVar, SetVar, pFlags, nargs, szargs, ppsv);
+}
+
+//------------------------------------------------------------------------------
+_declspec(dllexport) void append (LPSTR szv, LPSTR szx, BOOL (*GetVar)(LPSTR, LPSTR), void (*SetVar)(LPSTR, LPSTR), DWORD * pFlags, UINT nargs, LPSTR * szargs, PPROSERVICES * ppsv)
+{
+	MakeAction (ACTION_APPEND, szv, szx, GetVar, SetVar, pFlags, nargs, szargs, ppsv);
+}
+
+//------------------------------------------------------------------------------
+void MakeAction (int action, LPSTR szv, LPSTR szx, BOOL (*GetVar)(LPSTR, LPSTR), void (*SetVar)(LPSTR, LPSTR), DWORD * pFlags, UINT nargs, LPSTR * szargs, PPROSERVICES * ppsv)
+{
+	HWND oldhWnd;
+
+	**szargs = '\0';
+
+	if (nargs != 1)
+	{
+		ppsv->ErrMessage ("The service needs exactly one argument", NULL);
+		return;
+	}
+
+	oldhWnd = FindWindow (szWindowClass, NULL);
+	if (oldhWnd == NULL)
+		show (szv, szx, GetVar, SetVar, pFlags, nargs, szargs, ppsv);
+
+	SetForegroundWindow (hMainWnd);
+
+	switch (action)
+	{
+	case ACTION_EXECUTE:
+		bReading = FALSE;
+		DeleteCmdLine (hEdit, cmd_line_start);
+		WriteText (hEdit, szargs[1]);
+		bReading = TRUE;
+		SendMessage (hEdit, WM_CHAR, '\r', 0);
+		break;
+	case ACTION_PRINT:
+		bReading = FALSE;
+		DeleteCmdLine (hEdit, cmd_line_start);
+		WriteText (hEdit, szargs[1]);
+		bReading = TRUE;
+		break;
+	case ACTION_APPEND:
+		MoveCaretToEnd (hEdit);
+		bReading = FALSE;
+		WriteText (hEdit, szargs[1]);
+		bReading = TRUE;
+		break;
+	}
+}
+
+//------------------------------------------------------------------------------
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
 	int wmId, wmEvent;
@@ -210,10 +285,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	switch (message)
 	{
 	case WM_CREATE:
-	        hExitBtn = CreateWindow ( "BUTTON", NULL, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | BS_BITMAP | BS_FLAT, WND_WIDTH - 20, 2, 16, 16, hWnd, ( HMENU ) ID_EXITBTN, (HINSTANCE) GetWindowLong(hWnd, GWL_HINSTANCE), NULL );
+	        hExitBtn = CreateWindow ( "BUTTON", NULL, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | BS_BITMAP | BS_FLAT, WND_WIDTH - 20, 2, 16, 16, hWnd, ( HMENU ) ID_EXITBTN, hInst, NULL );
 	        SendMessage (hExitBtn, BM_SETIMAGE, (WPARAM) IMAGE_BITMAP, (LPARAM) (HANDLE) hbClose);
 
-	        hMinimizeBtn = CreateWindow ( "BUTTON", NULL, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | BS_BITMAP | BS_FLAT, WND_WIDTH - 37, 2, 16, 16, hWnd, ( HMENU ) ID_MINIMIZEBTN, (HINSTANCE) GetWindowLong(hWnd, GWL_HINSTANCE), NULL );
+	        hMinimizeBtn = CreateWindow ( "BUTTON", NULL, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | BS_BITMAP | BS_FLAT, WND_WIDTH - 37, 2, 16, 16, hWnd, ( HMENU ) ID_MINIMIZEBTN, hInst, NULL );
 	        SendMessage (hMinimizeBtn, BM_SETIMAGE, (WPARAM) IMAGE_BITMAP, (LPARAM) (HANDLE) hbMinimize);
 
 	        hEdit = CreateWindow("EDIT", NULL, WS_CHILD | WS_VISIBLE | WS_VSCROLL| WS_BORDER | ES_LEFT | ES_MULTILINE | ES_AUTOVSCROLL | ES_WANTRETURN,
@@ -221,17 +296,19 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 SendMessage (hEdit, WM_SETFONT, (WPARAM) hFont, MAKELPARAM(TRUE, 0));
 
                 hWatch = CreateWindow ("EDIT", NULL, WS_CHILD | WS_VISIBLE | WS_VSCROLL | WS_BORDER | ES_LEFT | ES_MULTILINE | ES_AUTOVSCROLL | ES_WANTRETURN,
-                                       0, 0, 0, 0, hWnd, (HMENU) ID_WATCHBOX, (HINSTANCE) GetWindowLong (hWnd, GWL_HINSTANCE), NULL);
+                                       0, 0, 0, 0, hWnd, (HMENU) ID_WATCHBOX, hInst, NULL);
 		SendMessage (hWatch, WM_SETFONT, (WPARAM) hFont, MAKELPARAM(TRUE, 0));
 
-                WriteWelcomeMessage(hEdit);
+		WriteWelcomeMessage(hEdit);
                 WritePrompt (hEdit);
 
-                OrigEditWndProc = (WNDPROC) SetWindowLong (hEdit, GWL_WNDPROC, (LONG) EditWndProc);
+		//cmd_line_start = GetPosition(hEdit);
+		SendMessage (hEdit, EM_GETSEL, (WPARAM) &cmd_line_start, 0);
 
-                bReading = TRUE;
-                
+		OrigEditWndProc = (WNDPROC) SetWindowLong (hEdit, GWL_WNDPROC, (LONG) EditWndProc);
 		SetForegroundWindow (hWnd);
+
+		bReading = TRUE;
                 break;
         case WM_SETFOCUS:
         	SetFocus (hEdit);
@@ -259,6 +336,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	case WM_PAINT:
 		hdc = BeginPaint(hWnd, &ps);
 		SelectObject(hdc, hFont);
+		SetTextColor (hdc, RGB(0, 0, 0));
                 SetBkColor (hdc, RGB(236, 233, 216));
                 TextOut (hdc, 20, 2, "***   Console Plugin   ***   Console Plugin   ***   Console Plugin   ***", strlen ("***   Console Plugin   ***   Console Plugin   ***   Console Plugin   ***") );
                 TextOut (hdc, 10, WND_HEIGHT + 2, "Watches:", strlen("Watches:"));
@@ -270,9 +348,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		break;
 	case WM_DESTROY:
 	        SetWindowLong(hEdit, GWL_WNDPROC, (LONG) OrigEditWndProc);
-		if (hFont) DeleteObject (hFont);
-		if (hbClose) DeleteObject (hbClose);
-		if (hbMinimize) DeleteObject (hbMinimize);
+		if (hFont != NULL) DeleteObject (hFont);
+		if (hbClose != NULL) DeleteObject (hbClose);
+		if (hbMinimize != NULL) DeleteObject (hbMinimize);
 		KillTimer (hMainWnd, IDT_TIMER);
 		FreeMemory();
 		break;
@@ -338,7 +416,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 }
 
 //------------------------------------------------------------------------------
-LRESULT CALLBACK	EditWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+LRESULT CALLBACK EditWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
 	switch (message)
 	{
@@ -351,73 +429,150 @@ LRESULT CALLBACK	EditWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
 	case WM_LBUTTONDBLCLK:
 		SetFocus(hWnd);
 		return 0;
+	case WM_UNDO:
+		return 0;
 	case WM_KEYDOWN:
 		switch (wParam)
 		{
-                case VK_DELETE:
-	        	return 0;
-	        case VK_UP:
-	        	if (bReading == TRUE)
-	        	{	
-	        		unsigned char * p = GetPreviousCommand();
-	        		
-	        		if (p != NULL)
-	        		{
-		        		bReading = FALSE;
-		        		while (position > 0)
-	        			{
-	        				SendMessage (hWnd, WM_CHAR, '\b', 1);
-	        				position--;
-		        		}     		
-	        			WriteText(hWnd, p);
-	        			position = strlen (p);
-					ZeroMemory (cmdline, MAX_LENGTH + 1);
-					strcpy (cmdline, p);
-	        			bReading = TRUE;	        			
-	        		}	        		
-	        	}
-	        	return 0;
-	        case VK_DOWN:
-	        	if (bReading == TRUE)
-	        	{
-	        		unsigned char * p = GetNextCommand();
-	        		
-	        		if (p != NULL)
-	        		{
-	        			bReading = FALSE;
-	        			while (position > 0)
-	        			{
-	        				SendMessage (hWnd, WM_CHAR, '\b', 1);
-	        				position--;
-	        			}
-	        			WriteText(hWnd, p);
-	        			position = strlen (p);
-	        			ZeroMemory (cmdline, MAX_LENGTH + 1);
-	        			strcpy (cmdline, p);	        			
-	        			bReading = TRUE;
-	        		}
-	        	}
-	        	return 0;
-	        case VK_LEFT:
-	        	return 0;
-	        case VK_RIGHT:
-	        	return 0;
-	        case VK_END:
-	        	return 0;
 	        case VK_HOME:
-	        	return 0;
+	        {
+        		int current_position = GetPosition (hWnd);
+        		SHORT ctrl_pressed = GetAsyncKeyState (VK_CONTROL) & 0x8000;
+			SHORT shift_pressed = GetAsyncKeyState (VK_SHIFT) & 0x8000;
+
+			if ( ctrl_pressed && shift_pressed )
+			{
+				int sel_start, sel_end;
+
+				SendMessage (hWnd, EM_GETSEL, (WPARAM) &sel_start, (LPARAM)&sel_end);
+				if (sel_start == current_position)
+				{
+					SendMessage (hWnd, EM_SETSEL, (WPARAM) sel_end, (LPARAM) cmd_line_start);
+				}
+				else
+					SendMessage (hWnd, EM_SETSEL, (WPARAM) sel_start, (LPARAM) cmd_line_start);
+				return 0;
+			}
+			else if ( ctrl_pressed )
+			{
+				SendMessage (hWnd, EM_SETSEL, (WPARAM) cmd_line_start, (LPARAM) cmd_line_start);
+				return 0;
+			}
+			else if ( shift_pressed)
+			{
+				POINT caret_pos;
+
+				if (cmd_line_start == current_position)
+					return 0;
+
+				GetCaretPos (&caret_pos);
+				if (caret_pos.y == HIWORD(SendMessage (hWnd, EM_POSFROMCHAR, (WPARAM) cmd_line_start, 0)))
+				{
+					int sel_start, sel_end;
+
+					SendMessage (hWnd, EM_GETSEL, (WPARAM) &sel_start, (LPARAM)&sel_end);
+					if (sel_start == current_position)
+					{
+						SendMessage (hWnd, EM_SETSEL, (WPARAM) sel_end, (LPARAM) cmd_line_start);
+					}
+					else
+						SendMessage (hWnd, EM_SETSEL, (WPARAM) sel_start, (LPARAM) cmd_line_start);
+					return 0;
+				}
+				else
+					return CallWindowProc(OrigEditWndProc, hWnd, message, wParam, lParam);
+			}
+			else
+			{
+				POINT caret_pos;
+
+				GetCaretPos (&caret_pos);
+				if (caret_pos.y == HIWORD(SendMessage (hWnd, EM_POSFROMCHAR, (WPARAM) cmd_line_start, 0)))
+				{
+					SendMessage (hWnd, EM_SETSEL, (WPARAM) cmd_line_start, (LPARAM) cmd_line_start);
+					return 0;
+				}
+				else
+					return CallWindowProc(OrigEditWndProc, hWnd, message, wParam, lParam);
+			}
+		}
+		case VK_LEFT:
+        	{
+        		int current_position = GetPosition (hWnd);
+        		SHORT ctrl_pressed = GetAsyncKeyState (VK_CONTROL) & 0x8000;
+			SHORT shift_pressed = GetAsyncKeyState (VK_SHIFT) & 0x8000;
+
+			if ( ctrl_pressed && shift_pressed )
+			{
+				int sel_start, sel_end;
+				SendMessage (hWnd, EM_GETSEL, (WPARAM) &sel_start, (LPARAM)&sel_end);
+				if (sel_start == current_position)
+				{
+					SendMessage (hWnd, EM_SETSEL, (WPARAM) sel_end, (LPARAM) cmd_line_start);
+				}
+				else
+					SendMessage (hWnd, EM_SETSEL, (WPARAM) sel_start, (LPARAM) cmd_line_start);
+				return 0;
+			}
+			else if ( ctrl_pressed )
+			{
+				SendMessage (hWnd, EM_SETSEL, (WPARAM) cmd_line_start, (LPARAM) cmd_line_start);
+				return 0;
+			}
+			else if ( cmd_line_start == current_position )
+			{
+				return 0;
+			}
+			else
+			{
+				return CallWindowProc(OrigEditWndProc, hWnd, message, wParam, lParam);
+			}
+        	}
+	        case VK_UP:
+		{
+			unsigned char * p = GetPreviousCommand();
+
+	        	if (p != NULL)
+	        	{
+		        	bReading = FALSE;
+
+				DeleteCmdLine (hWnd, cmd_line_start);
+        			WriteText(hWnd, p);
+
+				bReading = TRUE;
+        		}
+			return 0;
+        	}
+	        case VK_DOWN:
+		{
+       			unsigned char * p = GetNextCommand();
+
+        		if (p != NULL)
+		       	{
+		       		bReading = FALSE;
+
+		       		DeleteCmdLine (hWnd, cmd_line_start);
+				WriteText (hWnd, p);
+
+				bReading = TRUE;
+	    		}
+			return 0;
+        	}
 		default:
 			return CallWindowProc(OrigEditWndProc, hWnd, message, wParam, lParam);
 		}
 	case WM_CHAR:
 		switch (wParam)
 		{
-	        case '\r':
-	        	if (bReading == TRUE)
+		case '\r':
+			if (bReading == TRUE)
 	        	{
-	        		unsigned char * p = NULL;
-	        		LRESULT result = CallWindowProc(OrigEditWndProc, hWnd, message, wParam, lParam);
-	        		bReading = FALSE;
+				unsigned char * p = NULL;
+				bReading = FALSE;
+
+				MoveCaretToEnd (hWnd);
+				GetCmdLine (hWnd, cmd_line_start, cmdline);
+				WriteText (hWnd, "\n");
 
 				AddCommandToList (cmdline);
 
@@ -507,7 +662,7 @@ LRESULT CALLBACK	EditWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
 	                                			WriteText (hWnd, "Error! Cannot have a watch for a keyword.\n");
 	                                		}
 	                                		else
-	                                		{                                			
+	                                		{
 		                                		if (strlen(p) <= MAX_VAR_LENGTH)
 		                                		{
 	        	                        			strcpy (watches[0], p);
@@ -537,7 +692,7 @@ LRESULT CALLBACK	EditWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
 	                                			WriteText (hWnd, "Error! Cannot have a watch for a keyword.\n");
 	                                		}
 	                                		else
-	                                		{                                			
+	                                		{
 		                                		if (strlen(p) <= MAX_VAR_LENGTH)
 		                                		{
 	        	                        			strcpy (watches[1], p);
@@ -567,7 +722,7 @@ LRESULT CALLBACK	EditWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
 	                                			WriteText (hWnd, "Error! Cannot have a watch for a keyword.\n");
 	                                		}
 	                                		else
-	                                		{                                			
+	                                		{
 		                                		if (strlen(p) <= MAX_VAR_LENGTH)
 		                                		{
 	        	                        			strcpy (watches[2], p);
@@ -597,7 +752,7 @@ LRESULT CALLBACK	EditWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
 	                                			WriteText (hWnd, "Error! Cannot have a watch for a keyword.\n");
 	                                		}
 	                                		else
-	                                		{                                			
+	                                		{
 		                                		if (strlen(p) <= MAX_VAR_LENGTH)
 		                                		{
 	        	                        			strcpy (watches[3], p);
@@ -659,10 +814,6 @@ LRESULT CALLBACK	EditWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
                                 		DestroyWindow(hMainWnd);
                                 		UnregisterClass(szWindowClass, hInst);
 	                                }
-	                                else if (strcmpi (p, "console.unload") == 0 || strcmpi (p, "console.unload()") == 0)
-	                                {
-	                                	WriteText (hWnd, "Error! This command is not supported.\n");
-	                                }
         	                        else if (strcmpi (p, "get") == 0)
                 	                {
 	        				p = strtok (NULL, " ");
@@ -701,6 +852,18 @@ LRESULT CALLBACK	EditWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
 		        				WriteText (hWnd, "Error! 'Get' needs one argument.\n");
 		        			}
 	                                }
+					else if (strcmpi (p, "console.close") == 0 || strcmpi (p, "console.close()") == 0
+						|| strcmpi (p, "console.show") == 0 || strcmpi (p, "console.show()") == 0
+						|| strcmpi (p, "console.unload") == 0 || strcmpi (p, "console.unload()") == 0)
+	                                {
+	                                	WriteText (hWnd, "Error! This command is not supported.\n");
+	                                }
+					else if ((strlen (p) >= strlen("console.execute") && _memicmp (p, "console.execute", strlen("console.execute")) == 0)
+						|| (strlen (p) >= strlen("console.print") && _memicmp (p, "console.print", strlen("console.print")) == 0)
+						|| (strlen (p) >= strlen("console.append") && _memicmp (p, "console.append", strlen("console.append")) == 0))
+					{
+						WriteText (hWnd, "Error! This command is not supported.\n");
+					}
         	                        else if (PProServices->EvalExpr(cmdline, cmdresult) == TRUE)
 	        			{
 	        				WriteText (hWnd, "Result: ");
@@ -709,60 +872,33 @@ LRESULT CALLBACK	EditWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
 		        		}
 	        			else
 	        			{
-		        			WriteText (hWnd, "Result: EvalExpr error!\n");
+		        			WriteText (hWnd, "Result: EvalExpr() error!\n");
 			        	}
 			        }
 
-	        		ZeroMemory (cmdline, MAX_LENGTH + 1);
-	        		position = 0;
-	        		WritePrompt(hWnd);
-	        		bReading = TRUE;
-	        		return result;
-	        	}
-	        	else
-	        	{
-	        		return CallWindowProc(OrigEditWndProc, hWnd, message, wParam, lParam);
-	        	}
-	        case '\t':
-	        	if (bReading == TRUE)
-	        	{
+				WritePrompt(hWnd);
+	        		cmd_line_start = GetPosition(hWnd);
+
+				bReading = TRUE;
 	        		return 0;
 	        	}
 	        	else
-	        		return CallWindowProc(OrigEditWndProc, hWnd, message, wParam, lParam);
-	        case '\b':
-	        	if (bReading == TRUE)
+				return CallWindowProc(OrigEditWndProc, hWnd, message, wParam, lParam);
+		case '\b':
+			if (bReading == TRUE)
 	        	{
-	        		if (position > 0)
-	        		{
-	        			position--;
-	        			cmdline[position] = '\0';
-	        			return CallWindowProc(OrigEditWndProc, hWnd, message, wParam, lParam);
-	        		}
-	        		else
-	        			return 0;
+	        		if (cmd_line_start == GetPosition (hWnd) )
+				{
+					return 0;
+				}
+				else
+					return CallWindowProc(OrigEditWndProc, hWnd, message, wParam, lParam);
 	        	}
 	        	else
 	        		return CallWindowProc(OrigEditWndProc, hWnd, message, wParam, lParam);
-	        default:
-	        	if (bReading == TRUE)
-	        	{                        	
-                        	if (position < MAX_LENGTH)
-                        	{
-                        		cmdline[position] = wParam;
-                        		position++;
-                        	}
-                        	else
-                        		return 0;
-                        }
-	 		return CallWindowProc(OrigEditWndProc, hWnd, message, wParam, lParam);
+		default:
+			return CallWindowProc(OrigEditWndProc, hWnd, message, wParam, lParam);
 		}
-	case WM_PASTE:
-		return 0;
-	case WM_CUT:
-		return 0;
-	case WM_UNDO:
-		return 0;	
 	default:
 	        return CallWindowProc(OrigEditWndProc, hWnd, message, wParam, lParam);
 	}
@@ -770,14 +906,14 @@ LRESULT CALLBACK	EditWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
 }
 
 //------------------------------------------------------------------------------
-void    WriteText (HWND hwnd, unsigned char * text)
+void    WriteText (HWND hwnd, const unsigned char * text)
 {
 	int i;
         int length = strlen (text);
 
 	for (i = 0; i < length; i++)
 	{
-		SendMessage (hwnd, WM_CHAR, text[i], 0x01000001);
+		SendMessage (hwnd, WM_CHAR, text[i], 0);
 	}
 }
 
@@ -790,7 +926,7 @@ void	WritePrompt (HWND hwnd)
 //------------------------------------------------------------------------------
 int IncreaseLineNum (int number)
 {
-	if (number == LAST_COMMANDS_COUNT - 1)
+	if (number == PREVIOUS_COMMANDS_COUNT - 1)
 	{
 		return 0;
 	}
@@ -802,7 +938,7 @@ int DecreaseLineNum (int number)
 {
 	if (number == 0)
 	{
-		return LAST_COMMANDS_COUNT - 1;
+		return PREVIOUS_COMMANDS_COUNT - 1;
 	}
 	else return number - 1;
 }
@@ -811,6 +947,9 @@ int DecreaseLineNum (int number)
 BOOL	AllocateMemory()
 {
 	int i;
+
+	editboxtext = (unsigned char *) calloc (buffer_size, sizeof (unsigned char));
+	if (editboxtext == NULL) return FALSE;
 
 	cmdline = (unsigned char *) calloc (MAX_LENGTH + 1, sizeof(unsigned char));
 	if (cmdline == NULL) return FALSE;
@@ -832,12 +971,12 @@ BOOL	AllocateMemory()
 		if (watches[i] == NULL) return FALSE;
 	}
 
-	lastcmdlines = (unsigned char **) calloc (LAST_COMMANDS_COUNT, sizeof(unsigned char *));
-	if (lastcmdlines == NULL) return FALSE;
-	for (i = 0; i < LAST_COMMANDS_COUNT; i++)
+	previous_commands = (unsigned char **) calloc (PREVIOUS_COMMANDS_COUNT, sizeof(unsigned char *));
+	if (previous_commands == NULL) return FALSE;
+	for (i = 0; i < PREVIOUS_COMMANDS_COUNT; i++)
 	{
-		lastcmdlines[i] = (unsigned char *) calloc (MAX_LENGTH + 1, sizeof (unsigned char));
-		if (lastcmdlines[i] == NULL) return FALSE;
+		previous_commands[i] = (unsigned char *) calloc (MAX_LENGTH + 1, sizeof (unsigned char));
+		if (previous_commands[i] == NULL) return FALSE;
 	}
         return TRUE;
 }
@@ -847,16 +986,17 @@ void	FreeMemory()
 {
 	int i;
 
+	free (editboxtext);
 	free (cmdline);
 	free (cmdresult);
 	free (cmdlinetemp);
 	free (variablename);
 
-	for (i = 0; i < LAST_COMMANDS_COUNT; i++)
+	for (i = 0; i < PREVIOUS_COMMANDS_COUNT; i++)
 	{
-		free(lastcmdlines[i]);
+		free(previous_commands[i]);
 	}
-	free (lastcmdlines);
+	free (previous_commands);
 
 	for (i = 0; i < WATCHES_COUNT; i++)
 	{
@@ -866,7 +1006,7 @@ void	FreeMemory()
 }
 
 //------------------------------------------------------------------------------
-BOOL	IsKeyword (unsigned char * name)
+BOOL	IsKeyword (const unsigned char * name)
 {
 	if ( strcmpi ("acdc", name) == 0 ) return TRUE;
 	if ( strcmpi ("allglobals", name) == 0 ) return TRUE;
@@ -949,7 +1089,7 @@ BOOL	IsKeyword (unsigned char * name)
 	if ( strcmpi ("xtime", name) == 0 ) return TRUE;
 	if ( strcmpi ("ymouse", name) == 0 ) return TRUE;
 	if ( strcmpi ("yscreen", name) == 0 ) return TRUE;
-	
+
 	return FALSE;
 }
 
@@ -959,19 +1099,19 @@ unsigned char *	GetNextCommand ()
 	int tmp;
 	if (linenum == linenumfornext)
 	{
-		return NULL;	
+		return NULL;
 	}
-	
+
 	tmp = IncreaseLineNum (linenum);
-	
-	if (tmp == linenumfornext || strcmp(lastcmdlines[tmp], "") == 0)
+
+	if (tmp == linenumfornext || strcmp(previous_commands[tmp], "") == 0)
     	{
 		return NULL;
     	}
     	else
     	{
     		linenum = tmp;
-    		return lastcmdlines [linenum];
+    		return previous_commands [linenum];
     	}
 }
 
@@ -980,33 +1120,122 @@ unsigned char *	GetPreviousCommand ()
 {
 	int tmp = DecreaseLineNum (linenum);
 
-	if (tmp == linenumfornext || strcmp(lastcmdlines[tmp], "") == 0)
-    	{			
+	if (tmp == linenumfornext || strcmp(previous_commands[tmp], "") == 0)
+    	{
 		return NULL;
     	}
 	else
 	{
 		linenum = tmp;
-		return lastcmdlines[linenum];
+		return previous_commands[linenum];
 	}
-
 }
 
 //------------------------------------------------------------------------------
-void	AddCommandToList (unsigned char * cmd)
+void AddCommandToList (const unsigned char * cmd)
 {
 	if (strcmp (cmd, "") != 0)
 	{
-		strcpy (lastcmdlines[linenumfornext], cmd);
+		strcpy (previous_commands[linenumfornext], cmd);
                 linenumfornext = IncreaseLineNum (linenumfornext);
 	}
         linenum = linenumfornext;
 }
 
 //------------------------------------------------------------------------------
-void	WriteWelcomeMessage (HWND hwnd)
+int GetPosition (HWND hwnd)
 {
-	WriteText(hwnd, "\n           Console Plugin 1.0.1\n   Copyright (C) 2003 Artur Dorochowicz\n\n");
+	/*
+	int sel_start;
+	SendMessage (hwnd, EM_GETSEL, (WPARAM) &sel_start, 0);
+
+	return sel_start;
+	*/
+
+	POINT point;
+
+	GetCaretPos(&point);
+	return LOWORD(SendMessage (hwnd, EM_CHARFROMPOS, 0, MAKELPARAM (point.x, point.y)));
+}
+
+//------------------------------------------------------------------------------
+void MoveCaretToEnd (HWND hwnd)
+{
+	LRESULT length = SendMessage (hwnd, WM_GETTEXTLENGTH, 0, 0);
+	SendMessage (hwnd, EM_SETSEL, length, length);
+}
+
+//------------------------------------------------------------------------------
+void GetCmdLine (HWND hwnd, int start_position, char * target)
+{
+	/* OLD WAY, LocalLock always returns NULL on Windows 98
+	LRESULT memhandle;
+	char * text;
+	int length;
+
+	memhandle = SendMessage (hwnd, EM_GETHANDLE, 0, 0);
+	text = LocalLock ( (HLOCAL) memhandle);
+
+	length = strlen (text) - start_position;
+	if (length > 531) length = 531;
+
+	memcpy (target, &(text[start_position]), length);
+	target[length] = '\0';
+
+	LocalUnlock ((HLOCAL) memhandle);
+	*/
+
+	LRESULT length;
+
+	length = SendMessage (hwnd, WM_GETTEXTLENGTH, 0, 0);
+	length++;	//for terminating NULL character;
+
+	if (length > buffer_size)
+	{
+		unsigned char * temp;
+
+		temp = (unsigned char *) realloc (editboxtext, 	2 * length);
+		buffer_size = 2 * length;
+
+		if (temp == NULL)
+		{
+			PProServices->ErrMessage("Error! Cannot increase text buffer size.\nThe console will close now.", NULL);
+			strcpy (target, "exit");
+			return;
+		}
+		else
+		{
+			editboxtext = temp;
+		}
+	}
+
+	GetWindowText (hwnd, editboxtext, length);
+
+	length -= start_position;
+	if (length > 532) length = 532;
+
+	memcpy (target, &(editboxtext[start_position]), length);
+}
+
+//------------------------------------------------------------------------------
+void DeleteCmdLine (HWND hwnd, int start_position)
+{
+	LRESULT length;
+
+	length = SendMessage (hwnd, WM_GETTEXTLENGTH, 0, 0);
+	MoveCaretToEnd (hwnd);
+
+	length -= start_position;
+	while (length-- > 0)
+	{
+		WriteText (hwnd, "\b");
+	}
+}
+
+//------------------------------------------------------------------------------
+void WriteWelcomeMessage (HWND hwnd)
+{
+	WriteText(hwnd, "\n           Console Plugin 1.0.2\n   Copyright (C) 2003 Artur Dorochowicz\n\n");
 }
 
 //------------------------------------------------------------------------------
