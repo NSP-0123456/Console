@@ -11,8 +11,8 @@ LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_UK
 #endif
 
 VS_VERSION_INFO VERSIONINFO
-FILEVERSION     1,0,0,0
-PRODUCTVERSION  1,0,0,0
+FILEVERSION     1,0,1,0
+PRODUCTVERSION  1,0,1,0
 FILEFLAGSMASK   VS_FFI_FILEFLAGSMASK
 FILEOS          VOS__WINDOWS32
 FILETYPE        VFT_DLL
@@ -24,12 +24,12 @@ BEGIN
     BEGIN
       VALUE "CompanyName",      "x-phile"
       VALUE "FileDescription",  "Console Plugin"
-      VALUE "FileVersion",      "1.0.0"
+      VALUE "FileVersion",      "1.0.1"
       VALUE "InternalName",     "Console Plugin"
       VALUE "LegalCopyright",   "Copyright © 2003 Artur Dorochowicz"    
       VALUE "OriginalFilename", "Console.dll"
       VALUE "ProductName",      "Console Plugin"
-      VALUE "ProductVersion",   "1.0.0"
+      VALUE "ProductVersion",   "1.0.1"
     END
   END
   BLOCK "VarFileInfo"

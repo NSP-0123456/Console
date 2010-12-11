@@ -1,5 +1,5 @@
 /*
-  Console Plugin   version 1.0.0
+  Console Plugin   version 1.0.1
 
   Copyright (C) 2003 Artur Dorochowicz
   All Rights Reserved.
@@ -134,7 +134,7 @@ _declspec(dllexport) void show (LPSTR szv, LPSTR szx, BOOL (*GetVar)(LPSTR, LPST
 
         hbClose = LoadBitmap (hInst, MAKEINTRESOURCE(IDB_CLOSE));
 	hbMinimize = LoadBitmap (hInst, MAKEINTRESOURCE(IDB_MINIMIZE));
-
+	
         if (AllocateMemory() == FALSE)
         {
         	ppsv->ErrMessage("Error! Cannot allocate memory.", NULL);
@@ -230,6 +230,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 OrigEditWndProc = (WNDPROC) SetWindowLong (hEdit, GWL_WNDPROC, (LONG) EditWndProc);
 
                 bReading = TRUE;
+                
+		SetForegroundWindow (hWnd);
                 break;
         case WM_SETFOCUS:
         	SetFocus (hEdit);
@@ -261,6 +263,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 TextOut (hdc, 20, 2, "***   Console Plugin   ***   Console Plugin   ***   Console Plugin   ***", strlen ("***   Console Plugin   ***   Console Plugin   ***   Console Plugin   ***") );
                 TextOut (hdc, 10, WND_HEIGHT + 2, "Watches:", strlen("Watches:"));
 		EndPaint(hWnd, &ps);
+		break;
+	case WM_CLOSE:
+		DestroyWindow (hWnd);
+		UnregisterClass (szWindowClass, hInst);
 		break;
 	case WM_DESTROY:
 	        SetWindowLong(hEdit, GWL_WNDPROC, (LONG) OrigEditWndProc);
@@ -1000,7 +1006,7 @@ void	AddCommandToList (unsigned char * cmd)
 //------------------------------------------------------------------------------
 void	WriteWelcomeMessage (HWND hwnd)
 {
-	WriteText(hwnd, "\n           Console Plugin 1.0.0\n   Copyright (C) 2003 Artur Dorochowicz\n\n");
+	WriteText(hwnd, "\n           Console Plugin 1.0.1\n   Copyright (C) 2003 Artur Dorochowicz\n\n");
 }
 
 //------------------------------------------------------------------------------

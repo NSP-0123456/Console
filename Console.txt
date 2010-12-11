@@ -1,4 +1,4 @@
-Console Plugin   version 1.0.0
+Console Plugin   version 1.0.1
 
 Copyright (C) 2003 Artur Dorochowicz
 All Rights Reserved.
@@ -134,6 +134,12 @@ command: console.unload is ignored.
 
 6. HISTORY
 --------------------------------------------------------------------------------
+v. 1.0.1
+   - fixed: when started from a menu, the console window did not get focus.
+   - fixed: 'console.show' returned with error: "Error! RegisterClass() error."
+            when issued after closing console window other way than using 'exit'
+            command or 'console.unload' or clicking close button.
+
 v. 1.0.0
    - first public release
 
