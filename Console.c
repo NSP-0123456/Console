@@ -1,21 +1,21 @@
 /*
-  Console Plugin                                                               
+  Console Plugin
 
   Copyright (C) 2003-2004 Artur Dorochowicz
-                2012      fork NSP-0123456 
+                2012      fork NSP-0123456
   All Rights Reserved.
 */
 
 #include <windows.h>
 #include <stdio.h>
 #include <string.h>
-
 #include "resources.h"
 #include "version.h"
+#include "slre.h"
 
 //---MACROS---------------------------------------------------------------------
-#define MAX_VAR_LENGTH	63
-#define MAX_CMD_LENGTH		531
+#define MAX_VAR_LENGTH	        63
+#define MAX_CMD_LENGTH		    531
 
 #define PREVIOUS_COMMANDS_COUNT	30
 #define WATCHES_COUNT			5
@@ -33,36 +33,80 @@
 #define ACTION_EXECUTE		1
 #define ACTION_PRINT		2
 #define ACTION_APPEND		3
+#define ACTION_RESTART		4
 
 #define MAIN_WND_BK_COLOR	(RGB(236, 234, 220))
+
+//--------------------------------------------------------------------------------
+typedef BOOL (WINAPI *SLWA_FUNC)(HWND hwnd,COLORREF crKey,BYTE bAlpha,DWORD dwFlags);
 
 //------------------------------------------------------------------------------
 typedef struct tagPProServices
 {
-	void (* ErrMessage) (LPSTR, LPSTR);
-	BOOL (* MatchCaption) (HWND, LPSTR);
-	HWND (* FindMatchingWindow) (LPSTR,BOOL);
-	BOOL (* IsRolled) (HWND hw);
-	BOOL (* IsTrayMinned) (HWND hw);
-	void (* GetExeFullPath) (HWND hw, LPSTR szt);
-	void (* RollUp) (HWND hw);
-	void (* TrayMin) (HWND hw);
-	void (* SendKeys) (LPSTR sz);
-	BOOL (* EvalExpr) (LPSTR sz, LPSTR szo);
-	void (* Debug) (LPSTR sz1, LPSTR sz2,LPSTR sz3, LPSTR sz4, LPSTR sz5, LPSTR sz6);
-	LPSTR (* AllocTemp) (UINT leng);
-	void (* ReturnString) (LPSTR sz, LPSTR* szargs);
-	LPSTR (* GetVarAddr) (LPSTR var);
-	LPSTR (* SetVar) (LPSTR var, LPSTR val);
-	void (* IgnoreNextClip) ();
-	void (* Show) (HWND h);
-	void (* RunCmd) (LPSTR szCmd, LPSTR szParam, LPSTR szWork);
-	BOOL (* InsertStringForBar) ( LPSTR szStr, LPSTR szCmd);
-	void (* ResetFocus) ();
-} PPROSERVICES;
+	void (*ErrMessage)(LPSTR, LPSTR);
+	BOOL (*MatchCaption)(HWND, LPSTR);
+	HWND (*FindMatchingWindow)(LPSTR,BOOL);
+	BOOL (*IsRolled)(HWND hw);
+	BOOL (*IsTrayMinned)(HWND hw);
+	void (*GetExeFullPath)(HWND hw, LPSTR szt);
+	void (*RollUp)(HWND hw);
+	void (*TrayMin)(HWND hw);
+	void (*SendKeys)(LPSTR sz);
+	BOOL  (*EvalExpr)(LPSTR sz, LPSTR szo);
+	void  (*Debug)(LPSTR sz1, LPSTR sz2,LPSTR sz3, LPSTR sz4, LPSTR sz5, LPSTR sz6);
+	LPSTR (*AllocTemp)(UINT leng);
+	void (*ReturnString)(LPSTR sz, LPSTR* szargs);
+	LPSTR (*GetVarAddr)(LPSTR var);
+	LPSTR (*SetVar)(LPSTR var, LPSTR val);
+	void (*IgnoreNextClip)();
+	void (*Show)(HWND h);
+	void (*RunCmd)(LPSTR szCmd, LPSTR szParam, LPSTR szWork);
+	BOOL (*InsertStringForBar)(LPSTR szStr, LPSTR szCmd);
+	void (*ResetFocus)();
+	HWND (*NoteOpen)(LPSTR szFile, LPSTR szKeyWords, BOOL bActivate);
+	BOOL (*PumpMessages)();
+	BOOL (*RegForConfig)(void ( *callback )(LPSTR szList), BOOL bReg );
+	void (*SetPreviousFocus)(HWND h );
+	UINT (*SetDebug)(LPSTR sz,LPSTR sz2 );
+	UINT (*ScriptCancel)(LPSTR sz );
+	void (*GetCurrentDir)(HWND h,LPSTR szt);
+	void (*RegisterNonModal)(HWND h,BOOL b);
+	UINT (*GetVarSize)(LPSTR p);
+	BOOL (*RegisterSigOld)(BOOL b, LPSTR sig, LPSTR sig2, LPSTR szPlugName,
+				 void (*callback)(LPSTR sz), LPSTR szGet, LPSTR szSet,LPSTR szDo );
+	void (*FreeIfHandle)(LPSTR sz);
+	int (*LastMouse)(UINT u);
+	BOOL (*RegisterSig)(BOOL b, LPSTR sig, LPSTR sig2, LPSTR szPlugName,
+				 void (*callback)(LPSTR sz), LPSTR szGet, LPSTR szSet,LPSTR szDo,LPSTR szSetDo );
+	void (*ReturningNewHandle)();
+	LPSTR (*GetStaticVarAddr)(LPSTR sz, LPSTR szScript);
+	BOOL (*SetStaticVar)(LPSTR szName, LPSTR szScript, LPSTR szv,BOOL bCreate);
+	HWND (*ActiveMenu)(LPSTR szCap, LPSTR szSwit);
+	void (*SaveClip)(LPSTR szFileName, BOOL bTextOnly, BOOL bVerbose);
+	void (*LoadClip)(LPSTR szFileName, BOOL bTextOnly, BOOL bVerbose);
+	LPSTR (*EncodeFloat)(double x, LPSTR szBuff);
+	double (*DecodeFloat)(LPSTR szBuff);
+	void (*GetCaretPosScreen)(HWND h, POINT*pt);
+	void (*SetAddRefCallback)(LPSTR sig1,void (*refcallback)(LPSTR sz, BOOL addref));
+	void (*ChangeIfHandle)(LPSTR sz, BOOL b);
+	BOOL (*CallScriptFile)(LPSTR szPath, int narg, LPSTR* pargs);
+	LPSTR (*LoadScriptFile)(LPSTR szPath);
+	BOOL (*RegisterForMouseUpDown)(BOOL b, void (*callback)(UINT msg, UINT msg2));
+	LPSTR (*GetOutputAddr)(LPSTR szPath);
+	void (*SetForEach)(LPSTR sig,VOID* pForEach);
+	HMODULE (*LoadPlugin)(LPSTR sz);
+	LPSTR (*CallPlugin)(LPSTR pMod, LPSTR pService, LPSTR szBuf, UINT nargs, ...);
+	HWND (*GetPowerProWindow)(int code);  // 0 = main, 1 = debug
+	BOOL (*GetMonitorRect)(LPSTR, RECT*, BOOL);
+	BOOL (*GetMonitorName)(HWND, UINT, LPSTR);
+	HWND (*GetProcessHwnd)(LPSTR);
+	void (*DoExecProcess)(HWND h, BOOL run, LPSTR szExec, LPSTR szOut);
+}
+PPROSERVICES;
 
 //---GLOBAL VARIABLES-----------------------------------------------------------
 const char wnd_class_name [] = "Console Plugin " CONSOLE_VERSION;	// the main window class name
+const char consoleVersion [] = CONSOLE_VERSION;
 const char wnd_title [] = "Console Plugin for PPRO :";				// The title bar text
 const unsigned char default_font [] = "Courier New";	// default font name
 const unsigned char default_prompt [] = "?>";			// default prompt
@@ -70,7 +114,13 @@ const unsigned char default_prompt [] = "?>";			// default prompt
 char wnd_fulltitle [256] ;				// The title bar text
 char pproName      [70] ;				// The title bar text
 
-unsigned char fullwatch [8192];
+unsigned char fullwatch  [8192];
+unsigned char iniFullName[1024];
+unsigned char fullCmd    [1024];
+
+unsigned char appPro[150];
+unsigned char histPro[150];
+
 // ----
 
 PPROSERVICES * PProServices = NULL;
@@ -98,6 +148,8 @@ unsigned char * edit_ctrl_text = NULL;		// buffer for edit control text
 unsigned char ** previous_commands = NULL;	// stores previous command lines
 unsigned char ** watches = NULL;			// stores variables to check
 WNDPROC	OrigEditWndProc;		// original window procedure of edit control
+//
+struct slre re01;
 
 // settings
 unsigned char prompt[50];
@@ -111,13 +163,14 @@ int wnd_height;
 int wnd_width;
 int wnd_pos_left;
 int wnd_pos_top;
+int wnd_trans = -1 ;
+int wnd_remember = 0;
 BOOL font_bold;
 BOOL copyright_note;
 BOOL wnd_resizable;
+BOOL wnd_popup;
 
-//---EXTERN---------------------------------------------------------------------
-extern int yyparse( void );
-extern void yyrestart( FILE * );
+
 
 //---DECLARATIONS---------------------------------------------------------------
 LRESULT CALLBACK WndProc (HWND, UINT, WPARAM, LPARAM);
@@ -154,14 +207,28 @@ void WritePrompt( void );
 void WriteText( HWND, const unsigned char * );
 void ErrorMessage( const unsigned char * );
 void help ( );
-void history ( );
+void chistory ( );
+void hint ( int mode );
+void SetVAR( unsigned char * varname, unsigned char * value );
+
 
 //---DEFINITIONS----------------------------------------------------------------
+
+
+
+void FAR PASCAL WritePrivateProfileInt (LPCSTR lpszSection, LPCSTR lpszEntry, int Value, LPCSTR lpszFilename)
+{
+   char szConverted [20];
+   _itoa(Value, szConverted, 10);
+   WritePrivateProfileString (lpszSection, lpszEntry, szConverted,lpszFilename);
+}
+
+
 BOOL WINAPI DllMain (HINSTANCE hinstDLL, DWORD dwReason, LPVOID lpvReserved)
 {
 	if (dwReason == DLL_PROCESS_ATTACH)
 	{
-		instance = hinstDLL;		
+		instance = hinstDLL;
 	}
 	else
 	{
@@ -170,7 +237,7 @@ BOOL WINAPI DllMain (HINSTANCE hinstDLL, DWORD dwReason, LPVOID lpvReserved)
 			HWND oldhWnd = hMainWnd ;
 
 			/* oldhWnd = FindWindow(wnd_class_name,NULL); */
-      
+
 			if (oldhWnd)
 				DestroyWindow(oldhWnd);
 			UnregisterClass(wnd_class_name, hinstDLL);
@@ -180,8 +247,28 @@ BOOL WINAPI DllMain (HINSTANCE hinstDLL, DWORD dwReason, LPVOID lpvReserved)
 	return TRUE;
 }
 
+void doclose(){
+	HWND oldhWnd = hMainWnd;
+	if (oldhWnd)
+	{
+    if ( wnd_remember == 1 ){
+      RECT rc;
+      if ( GetWindowRect( hMainWnd, &rc ) ) {
+        WritePrivateProfileInt(appPro,  "Height",rc.bottom - rc.top, iniFullName);
+    	  WritePrivateProfileInt(appPro,  "Width",rc.right - rc.left, iniFullName);
+    	  WritePrivateProfileInt(appPro,  "Left",rc.left, iniFullName);
+    	  WritePrivateProfileInt(appPro,  "Top",rc.top, iniFullName);
+      }
+    }
+		DestroyWindow(oldhWnd);
+	}
+	UnregisterClass(wnd_class_name, instance);
+    hMainWnd = NULL;
+}
 //------------------------------------------------------------------------------
-_declspec(dllexport) void show (LPSTR szv, LPSTR szx, BOOL (*GetVar)(LPSTR, LPSTR), void (*SetVar)(LPSTR, LPSTR), DWORD * pFlags, UINT nargs, LPSTR * szargs, PPROSERVICES * ppsv)
+
+//------------------------------------------------------------------------------
+__declspec(dllexport) void show (LPSTR szv, LPSTR szx, BOOL (*GetVar)(LPSTR, LPSTR), void (*SetVar)(LPSTR, LPSTR), DWORD * pFlags, UINT nargs, LPSTR * szargs, PPROSERVICES * ppsv)
 {
 	WNDCLASS wc;
 	HDC hdc;
@@ -191,27 +278,44 @@ _declspec(dllexport) void show (LPSTR szv, LPSTR szx, BOOL (*GetVar)(LPSTR, LPST
 	**szargs = '\0';
 
 	PProServices = ppsv;
-   
+  //OutputDebugStringA("CALL SHOW");
+
+
 	// need 1 or 0 arguments
-	if (nargs >= 2)
+	if (nargs >= 2 && nargs != 6543210)
 	{
 		ErrorMessage( "The service needs at most one argument." );
 		return;
 	}
 
+    if ( nargs < 2 ){
+        iniFullName[0] = '\0';
+    }
 	// if window exists - exit
 	//oldhWnd = FindWindow( wnd_class_name, NULL );
 	if (oldhWnd != NULL)
 		return;
 
-	// set initial values
+  re01.options = SLRE_CASE_INSENSITIVE;
+  compile2(&re01,"^\\s*([abcdefghijklmnopqrstuvwxyz_0123456789]+)\\s*=\\s*(.*)$");
+
+  // set initial values
   ppsv->EvalExpr("pproprocessname",pproName);
   sprintf(wnd_fulltitle,"%s%s",wnd_title,pproName);
+  strcpy(appPro,"Appearance" );
+  strcpy(histPro,"History");
+  if( stricmp(pproName,"main") ){
+    strcat(appPro,"." );
+    strcat(histPro,"." );
+    strcat(appPro,pproName );
+    strcat(histPro,pproName );
+  }
 	awaiting_input = FALSE;
 	watches_enabled = FALSE;
 	line_num = 0;
 	line_num_for_next = 0;
 	buffer_size = 100000;
+  //OutputDebugStringA(pproName);
 
 	// load bitmaps
 	hbClose = LoadBitmap (instance, MAKEINTRESOURCE (IDB_CLOSE));
@@ -240,39 +344,104 @@ _declspec(dllexport) void show (LPSTR szv, LPSTR szx, BOOL (*GetVar)(LPSTR, LPST
 		FreeResources ();
 		return;
 	}
-
-
-	// if we have one argument then load settings from file
-	if (nargs == 1)
-	{
-     
-    // FontSettings
-    GetPrivateProfileString("FontSettings",  "Name", default_font, font_name, 75, szargs[1]); 
-    font_size = GetPrivateProfileInt("FontSettings",  "Size", 9, szargs[1] );
-    font_bold = GetPrivateProfileInt("FontSettings",  "Bold", 0, szargs[1] ) != 0;
-
-    GetPrivateProfileString("FontSettings",  "WName", default_font, wfont_name, 75, szargs[1]); 
-    wfont_size = GetPrivateProfileInt("FontSettings",  "WSize", 9, szargs[1] );
-    wfont_bold = GetPrivateProfileInt("FontSettings",  "WBold", 0, szargs[1] ) != 0;
-
-    //Appearance
-    GetPrivateProfileString("Appearance",  "Prompt", default_prompt, prompt, 50, szargs[1]); 
-    copyright_note = GetPrivateProfileInt("Appearance",  "CopyrightNote", 1, szargs[1]) != 0;
-    wnd_resizable = GetPrivateProfileInt("Appearance",  "Resizable", 0, szargs[1]) != 0;
-    
-    // Appearance window position
-    wnd_height = GetPrivateProfileInt("Appearance",  "Height",500, szargs[1]);
-	  wnd_width = GetPrivateProfileInt("Appearance",  "Width",580, szargs[1]);
-	  wnd_pos_left = GetPrivateProfileInt("Appearance",  "Left",50, szargs[1]);
-	  wnd_pos_top = GetPrivateProfileInt("Appearance",  "Top",50, szargs[1]);
-  }
-	// allocate memory
+  //
+  	// allocate memory
 	if ( FALSE == AllocateMemory( ) )
 	{
 		ErrorMessage( "Cannot allocate memory." );
 		FreeResources();
 		return;
 	}
+
+
+	// if we have one argument then load settings from file
+  	if ( nargs == 1 )
+  	{
+        //OutputDebugStringA("SHOW WITH 1 ARG");
+       if ( strchr(szargs[1],':') == NULL && strchr(szargs[1],'%') == NULL){
+         ppsv->EvalExpr("pprofolder",iniFullName);
+       }
+       strcat(iniFullName,szargs[1]);
+    } else if ( nargs == 0 || iniFullName[0] == 0 ) {
+         //OutputDebugStringA("SHOW WITH 0 ARG");
+         ppsv->EvalExpr("pprofolder",iniFullName);
+         strcat(iniFullName, "plugins\\console.ini" );
+    }
+    //OutputDebugStringA(iniFullName);
+
+    // FontSettings
+    GetPrivateProfileString("FontSettings",  "Name", default_font, font_name, 75, iniFullName);
+    font_size = GetPrivateProfileInt("FontSettings",  "Size", 9, iniFullName );
+    font_bold = GetPrivateProfileInt("FontSettings",  "Bold", 0, iniFullName ) != 0;
+
+    GetPrivateProfileString("FontSettings",  "WName", default_font, wfont_name, 75, iniFullName);
+    wfont_size = GetPrivateProfileInt("FontSettings",  "WSize", 9, iniFullName );
+    wfont_bold = GetPrivateProfileInt("FontSettings",  "WBold", 0, iniFullName ) != 0;
+
+    //Appearance
+    GetPrivateProfileString("Appearance",  "Prompt", default_prompt, prompt, 50, iniFullName);
+    copyright_note = GetPrivateProfileInt("Appearance",  "CopyrightNote", 1, iniFullName) != 0;
+    wnd_resizable = GetPrivateProfileInt("Appearance",  "Resizable", 1, iniFullName) != 0;
+    wnd_popup = GetPrivateProfileInt("Appearance",  "PopupWindow", 1, iniFullName) != 0;
+
+    // Appearance window position
+    wnd_height   = GetPrivateProfileInt("Appearance",  "Height",500, iniFullName);
+	  wnd_width    = GetPrivateProfileInt("Appearance",  "Width",580, iniFullName);
+	  wnd_pos_left = GetPrivateProfileInt("Appearance",  "Left",50, iniFullName);
+	  wnd_pos_top  = GetPrivateProfileInt("Appearance",  "Top",50, iniFullName);
+     
+    
+    wnd_trans    = GetPrivateProfileInt("Appearance",  "Transparency",-1, iniFullName);
+    wnd_remember  = GetPrivateProfileInt("Appearance", "RememberPos",0, iniFullName);
+    if( stricmp(pproName,"main") ){
+        GetPrivateProfileString(appPro,  "Prompt", prompt, prompt, 50, iniFullName);
+        copyright_note = GetPrivateProfileInt(appPro,  "CopyrightNote", copyright_note, iniFullName) != 0;
+        wnd_resizable = GetPrivateProfileInt(appPro,  "Resizable", wnd_resizable, iniFullName) != 0;
+        wnd_popup = GetPrivateProfileInt(appPro,  "PopupWindow", wnd_popup, iniFullName) != 0;
+    
+        // Appearance window position
+        wnd_height   = GetPrivateProfileInt(appPro,  "Height",wnd_height, iniFullName);
+    	  wnd_width    = GetPrivateProfileInt(appPro,  "Width",wnd_width, iniFullName);
+    	  wnd_pos_left = GetPrivateProfileInt(appPro,  "Left",wnd_pos_left, iniFullName);
+    	  wnd_pos_top  = GetPrivateProfileInt(appPro,  "Top",wnd_pos_top, iniFullName);
+         
+        
+        wnd_trans    = GetPrivateProfileInt(appPro,  "Transparency",wnd_trans, iniFullName);
+        wnd_remember  = GetPrivateProfileInt(appPro, "RememberPos",wnd_remember, iniFullName);
+    }
+    if ( wnd_trans >= 0 && wnd_trans < 256 ){
+        wnd_trans    = 255 - wnd_trans;
+    }
+
+
+    unsigned char tmp[10];
+   if( stricmp(pproName,"main") && GetPrivateProfileSection(histPro,tmp,10,iniFullName) ){
+    line_num_for_next = GetPrivateProfileInt(histPro, "next",0, iniFullName);
+    if ( ! ( line_num_for_next >= 0 && line_num_for_next < PREVIOUS_COMMANDS_COUNT )){
+       line_num_for_next = 0 ;
+    }
+    line_num = line_num_for_next;
+    for( int i = 0; i < PREVIOUS_COMMANDS_COUNT; i++ ){
+       sprintf(tmp,"H%02d",i);
+       if ( GetPrivateProfileString(histPro,  tmp, "", previous_commands[i], 531, iniFullName) ){
+         line_count = i+1 ;
+       }
+    }
+   }else{
+    line_num_for_next = GetPrivateProfileInt("History", "next",0, iniFullName);
+    if ( ! ( line_num_for_next >= 0 && line_num_for_next < PREVIOUS_COMMANDS_COUNT )){
+       line_num_for_next = 0 ;
+    }
+    line_num = line_num_for_next;
+    for( int i = 0; i < PREVIOUS_COMMANDS_COUNT; i++ ){
+       sprintf(tmp,"H%02d",i);
+       if ( GetPrivateProfileString("History",  tmp, "", previous_commands[i], 531, iniFullName) ){
+         line_count = i+1 ;
+       }
+    }
+   }
+    
+
 
 	// register class
 	wc.style = CS_HREDRAW | CS_VREDRAW;
@@ -326,7 +495,7 @@ _declspec(dllexport) void show (LPSTR szv, LPSTR szx, BOOL (*GetVar)(LPSTR, LPST
 			FALSE,				// underline attribute flag
 			FALSE,				// strikeout attribute flag
 			DEFAULT_CHARSET,		// character set identifier
-			OUT_DEFAULT_PRECIS,		// output precision
+			OUT_STROKE_PRECIS, //OUT_DEFAULT_PRECIS,		// output precision
 			CLIP_DEFAULT_PRECIS,	// clipping precision
 			DEFAULT_QUALITY,		// output quality
 			DEFAULT_PITCH | FF_DONTCARE,	// pitch and family
@@ -341,7 +510,8 @@ _declspec(dllexport) void show (LPSTR szv, LPSTR szx, BOOL (*GetVar)(LPSTR, LPST
 
 	// create main window
 	hMainWnd = CreateWindow (wnd_class_name, wnd_fulltitle,
-		(wnd_resizable == FALSE) ? (WS_POPUPWINDOW) : (WS_POPUPWINDOW | WS_SIZEBOX)|WS_EX_COMPOSITED,
+	//	(wnd_resizable == FALSE) ? (WS_POPUPWINDOW) : (WS_POPUPWINDOW | WS_SIZEBOX)|WS_EX_COMPOSITED,
+		(wnd_resizable == FALSE ? 0 : WS_SIZEBOX) | ( wnd_popup ? WS_POPUPWINDOW : WS_OVERLAPPEDWINDOW) |WS_EX_COMPOSITED,
 		wnd_pos_left, wnd_pos_top,
 		wnd_width, wnd_height,
 		NULL, NULL, instance, NULL);
@@ -352,40 +522,125 @@ _declspec(dllexport) void show (LPSTR szv, LPSTR szx, BOOL (*GetVar)(LPSTR, LPST
 		return;
 	}
 
+  if( wnd_trans < 255 &&  wnd_trans >= 0 ){
+    SetWindowLong (hMainWnd , GWL_EXSTYLE , GetWindowLong (hMainWnd , GWL_EXSTYLE ) | WS_EX_LAYERED ) ;
+  	SLWA_FUNC SetLayeredWindowAttributes;
+    HMODULE hUser32 = GetModuleHandle("USER32.DLL");
+    SetLayeredWindowAttributes = (SLWA_FUNC)GetProcAddress(hUser32,"SetLayeredWindowAttributes");
+    SetLayeredWindowAttributes(hMainWnd,0,wnd_trans, 2 );
+  }
+  char tmps[255];
+
 	ShowWindow(hMainWnd, SW_SHOW);
 	UpdateWindow(hMainWnd);
+
+}
+__declspec(dllexport) void handle(LPSTR szv, LPSTR szx, BOOL (*GetVar)(LPSTR, LPSTR),
+									void (*SetVar)(LPSTR, LPSTR), DWORD* pFlags,
+									UINT nargs, LPSTR* szargs, PPROSERVICES* ppsv){
+	**szargs=0;
+	if( hMainWnd ){
+	    snprintf(*szargs, 10, "%ld", hMainWnd);
+	}
 }
 
-//------------------------------------------------------------------------------
-_declspec(dllexport) void close (LPSTR szv, LPSTR szx, BOOL (*GetVar)(LPSTR, LPSTR), void (*SetVar)(LPSTR, LPSTR), DWORD * pFlags, UINT nargs, LPSTR * szargs, PPROSERVICES * ppsv)
+__declspec(dllexport) void inifile(LPSTR szv, LPSTR szx, BOOL (*GetVar)(LPSTR, LPSTR),
+									void (*SetVar)(LPSTR, LPSTR), DWORD* pFlags,
+									UINT nargs, LPSTR* szargs, PPROSERVICES* ppsv){
+
+		(ppsv->ReturnString)(iniFullName,szargs);
+}
+
+__declspec(dllexport) void version(LPSTR szv, LPSTR szx, BOOL (*GetVar)(LPSTR, LPSTR),
+									void (*SetVar)(LPSTR, LPSTR), DWORD* pFlags,
+									UINT nargs, LPSTR* szargs, PPROSERVICES* ppsv){
+
+		(ppsv->ReturnString)( consoleVersion ,szargs);
+}
+
+__declspec(dllexport) void restart(LPSTR szv, LPSTR szx, BOOL (*GetVar)(LPSTR, LPSTR),
+									void (*SetVar)(LPSTR, LPSTR), DWORD* pFlags,
+									UINT nargs, LPSTR* szargs, PPROSERVICES* ppsv){
+
+   //unsigned char tmp[1024];
+   //strcpy(tmp,iniFullName);
+   if ( szargs ){
+	  **szargs=0;
+   }
+   doclose();
+   show(szv,szx,GetVar,SetVar,pFlags,6543210, szargs,ppsv);
+}
+
+__declspec(dllexport) void history(LPSTR szv, LPSTR szx, BOOL (*GetVar)(LPSTR, LPSTR),
+									void (*SetVar)(LPSTR, LPSTR), DWORD* pFlags,
+									UINT nargs, LPSTR* szargs, PPROSERVICES* ppsv)
 {
-	HWND oldhWnd = hMainWnd;
+	**szargs=0;
+	if (nargs != 0)
+		(ppsv->ErrMessage)("Need 0 argument for service history", "");
+	else
+	{
+  int i = 0;
+  int len = 0;
+  if ( line_count > PREVIOUS_COMMANDS_COUNT ){
+	  for( i = line_num ; i < PREVIOUS_COMMANDS_COUNT ; i++){
+       if ( previous_commands[i][0] ) {
+	       len+= strlen(previous_commands[i]);
+         len++;
+       }
+	  }
+  }
+  for( i = 0 ; i < line_num  ; i++){
+       if ( previous_commands[i][0] ){
+	       len+= strlen(previous_commands[i]);
+         len++;
+       }
+  }
+
+  LPSTR p = (ppsv->AllocTemp)(len + 1);
+  p[0]=0;
+  if ( line_count > PREVIOUS_COMMANDS_COUNT ){
+	  for( i = line_num ; i < PREVIOUS_COMMANDS_COUNT ; i++){
+       if ( previous_commands[i][0] ) {
+	       strcat(p,previous_commands[i]);
+         strcat(p,"\n");
+       }
+	  }
+  }
+  for( i = 0 ; i < line_num  ; i++){
+       if ( previous_commands[i][0] ){
+	       strcat(p,previous_commands[i]);
+         strcat(p,"\n");
+       }
+  }
+         p[len] = 0;
+		(ppsv->ReturnString)(p,szargs);
+	}
+}
+
+__declspec(dllexport) void close (LPSTR szv, LPSTR szx, BOOL (*GetVar)(LPSTR, LPSTR), void (*SetVar)(LPSTR, LPSTR), DWORD * pFlags, UINT nargs, LPSTR * szargs, PPROSERVICES * ppsv)
+{
+
 
 	**szargs = '\0';
-
+    doclose();
 	// oldhWnd = FindWindow(wnd_class_name, NULL);
-	if (oldhWnd)
-	{
-		DestroyWindow(oldhWnd);
-	}
-	UnregisterClass(wnd_class_name, instance);
-  hMainWnd = NULL;
 }
 
 //------------------------------------------------------------------------------
-_declspec(dllexport) void execute (LPSTR szv, LPSTR szx, BOOL (*GetVar)(LPSTR, LPSTR), void (*SetVar)(LPSTR, LPSTR), DWORD * pFlags, UINT nargs, LPSTR * szargs, PPROSERVICES * ppsv)
+__declspec(dllexport) void execute (LPSTR szv, LPSTR szx, BOOL (*GetVar)(LPSTR, LPSTR), void (*SetVar)(LPSTR, LPSTR), DWORD * pFlags, UINT nargs, LPSTR * szargs, PPROSERVICES * ppsv)
 {
 	MakeAction (ACTION_EXECUTE, szv, szx, GetVar, SetVar, pFlags, nargs, szargs, ppsv);
 }
 
 //------------------------------------------------------------------------------
-_declspec(dllexport) void print (LPSTR szv, LPSTR szx, BOOL (*GetVar)(LPSTR, LPSTR), void (*SetVar)(LPSTR, LPSTR), DWORD * pFlags, UINT nargs, LPSTR * szargs, PPROSERVICES * ppsv)
+__declspec(dllexport) void print (LPSTR szv, LPSTR szx, BOOL (*GetVar)(LPSTR, LPSTR), void (*SetVar)(LPSTR, LPSTR), DWORD * pFlags, UINT nargs, LPSTR * szargs, PPROSERVICES * ppsv)
 {
 	MakeAction (ACTION_PRINT, szv, szx, GetVar, SetVar, pFlags, nargs, szargs, ppsv);
 }
 
 //------------------------------------------------------------------------------
-_declspec(dllexport) void append (LPSTR szv, LPSTR szx, BOOL (*GetVar)(LPSTR, LPSTR), void (*SetVar)(LPSTR, LPSTR), DWORD * pFlags, UINT nargs, LPSTR * szargs, PPROSERVICES * ppsv)
+__declspec(dllexport) void append (LPSTR szv, LPSTR szx, BOOL (*GetVar)(LPSTR, LPSTR), void (*SetVar)(LPSTR, LPSTR), DWORD * pFlags, UINT nargs, LPSTR * szargs, PPROSERVICES * ppsv)
 {
 	MakeAction (ACTION_APPEND, szv, szx, GetVar, SetVar, pFlags, nargs, szargs, ppsv);
 }
@@ -448,16 +703,17 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	switch (message)
 	{
 	case WM_CREATE:
-		// exit button
-		hExitBtn = CreateWindow ("BUTTON", NULL, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | BS_BITMAP | BS_FLAT,
-			0, 0, 0, 0, hWnd, ( HMENU ) ID_EXITBTN, instance, NULL );
-		SendMessage (hExitBtn, BM_SETIMAGE, (WPARAM) IMAGE_BITMAP, (LPARAM) (HANDLE) hbClose);
+    if ( wnd_popup ){
+      // exit button
+      hExitBtn = CreateWindow ("BUTTON", NULL, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | BS_BITMAP | BS_FLAT,
+        0, 0, 0, 0, hWnd, ( HMENU ) ID_EXITBTN, instance, NULL );
+      SendMessage (hExitBtn, BM_SETIMAGE, (WPARAM) IMAGE_BITMAP, (LPARAM) (HANDLE) hbClose);
 
-		// minimize button
-		hMinimizeBtn = CreateWindow ("BUTTON", NULL, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | BS_BITMAP | BS_FLAT,
-			0, 0, 0, 0, hWnd, ( HMENU ) ID_MINIMIZEBTN, instance, NULL );
-		SendMessage (hMinimizeBtn, BM_SETIMAGE, (WPARAM) IMAGE_BITMAP, (LPARAM) (HANDLE) hbMinimize);
-
+      // minimize button
+      hMinimizeBtn = CreateWindow ("BUTTON", NULL, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | BS_BITMAP | BS_FLAT,
+        0, 0, 0, 0, hWnd, ( HMENU ) ID_MINIMIZEBTN, instance, NULL );
+      SendMessage (hMinimizeBtn, BM_SETIMAGE, (WPARAM) IMAGE_BITMAP, (LPARAM) (HANDLE) hbMinimize);
+    }
 		// edit control
 		hEdit = CreateWindow("EDIT", NULL, WS_CHILD | WS_VISIBLE | WS_VSCROLL| WS_BORDER | ES_LEFT | ES_MULTILINE | ES_AUTOVSCROLL | ES_WANTRETURN,
 			0, 0, 0, 0, hWnd, (HMENU) ID_EDITBOX, (HINSTANCE) GetWindowLong(hWnd, GWL_HINSTANCE), NULL);
@@ -495,13 +751,13 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		if ( watches_enabled == TRUE )
 		{
 			wnd_height -= WATCH_WND_HEIGHT + SPACE_BETWEEN_WNDS;
-			MoveWindow( hEdit, 0, TITLE_BAR_HEIGHT, LOWORD(lParam), HIWORD(lParam) - WATCH_WND_HEIGHT - TITLE_BAR_HEIGHT - SPACE_BETWEEN_WNDS, TRUE );
+			MoveWindow( hEdit, 0, ( wnd_popup ? TITLE_BAR_HEIGHT : 0), LOWORD(lParam), HIWORD(lParam) - WATCH_WND_HEIGHT - ( wnd_popup ? TITLE_BAR_HEIGHT : 0) - SPACE_BETWEEN_WNDS, TRUE );
 			MoveWindow( hWatch, 0, HIWORD(lParam) - WATCH_WND_HEIGHT, LOWORD(lParam), WATCH_WND_HEIGHT, TRUE );
 		}
 		// watches are disabled
 		else
 		{
-			MoveWindow( hEdit, 0, TITLE_BAR_HEIGHT, LOWORD(lParam), HIWORD(lParam) - TITLE_BAR_HEIGHT, TRUE );
+			MoveWindow( hEdit, 0, ( wnd_popup ? TITLE_BAR_HEIGHT : 0), LOWORD(lParam), HIWORD(lParam) - ( wnd_popup ? TITLE_BAR_HEIGHT : 0), TRUE );
 			MoveWindow( hWatch, 0, HIWORD(lParam) + SPACE_BETWEEN_WNDS, LOWORD(lParam), WATCH_WND_HEIGHT, TRUE );
 		}
 		MoveWindow( hExitBtn, LOWORD(lParam) - 2 - 16, 2, 16, 16, TRUE );
@@ -528,6 +784,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		break;
 	case WM_PAINT:
 	{
+    if ( wnd_popup ){
 		HGDIOBJ old_obj;
 		RECT client_rect;
 
@@ -540,8 +797,20 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
 		EndPaint(hWnd, &ps);
 		return 0;
+    } else {
+      return DefWindowProc(hWnd, message, wParam, lParam);
+    }
+
 	}
 	case WM_CLOSE:
+    if ( wnd_remember == 1 ){
+      RECT rc;
+      GetWindowRect( hMainWnd, &rc );
+      WritePrivateProfileInt("Appearance",  "Height",rc.bottom - rc.top, iniFullName);
+  	  WritePrivateProfileInt("Appearance",  "Width",rc.right - rc.left, iniFullName);
+  	  WritePrivateProfileInt("Appearance",  "Left",rc.left, iniFullName);
+  	  WritePrivateProfileInt("Appearance",  "Top",rc.top, iniFullName);
+    }
 		DestroyWindow (hWnd);
 		UnregisterClass (wnd_class_name, instance);
     hMainWnd = NULL;
@@ -549,10 +818,20 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	case WM_DESTROY:
 		SetWindowLong(hEdit, GWL_WNDPROC, (LONG) OrigEditWndProc);
 		KillTimer (hMainWnd, IDT_TIMER);
+    if ( wnd_remember == 1 ){
+      RECT rc;
+      if ( GetWindowRect( hMainWnd, &rc ) ){
+        WritePrivateProfileInt("Appearance",  "Height",rc.bottom - rc.top, iniFullName);
+    	  WritePrivateProfileInt("Appearance",  "Width",rc.right - rc.left, iniFullName);
+    	  WritePrivateProfileInt("Appearance",  "Left",rc.left, iniFullName);
+    	  WritePrivateProfileInt("Appearance",  "Top",rc.top, iniFullName);
+      }
+    }
 		FreeResources ();
 		return 0;
 	case WM_NCHITTEST:
 	{
+    if (wnd_popup ){
 		LRESULT result;
 		RECT WndRect;
 
@@ -561,6 +840,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		if (result == HTCLIENT && (HIWORD(lParam) - WndRect.top) < TITLE_BAR_HEIGHT && (LOWORD(lParam) - WndRect.left) < (wnd_width - 2 - 16 - 1 - 16 - 2))
 			result = HTCAPTION;
 		return result;
+    } else {
+      return DefWindowProc(hWnd, message, wParam, lParam);
+    }
 	}
 	case WM_TIMER:
 		switch (wParam)
@@ -573,11 +855,11 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			int i;
 
       fullwatch[0] = 0 ;
-      
+
       strcat(fullwatch, "PPRo process name : ");
       strcat(fullwatch, pproName );
       strcat(fullwatch, "\r\n");
-      
+
 			for (i = 0; i < WATCHES_COUNT; i++)
 			{
 				sprintf (num, "%d", i + 1);
@@ -590,7 +872,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 					value = (PProServices->GetVarAddr(watches[i]));
 					if (value != NULL)
 					{
-						strcat(fullwatch, value);
+						strncat(fullwatch, value,150);
 						strcat(fullwatch, "\r\n");
 					}
 					else
@@ -628,19 +910,19 @@ LRESULT CALLBACK EditWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
 	switch (message)
 	{
   case WM_PASTE:
-    if ( awaiting_input == TRUE ){
-      if (  GetCaretPositionByGetCaretPos() < cmd_line_start  ){
-            MoveCaretToEnd();
-    }
+      if ( awaiting_input == TRUE ){
+        if (  GetCaretPositionByGetCaretPos() < cmd_line_start  ){
+              MoveCaretToEnd();
+      }
     }
 	 return CallWindowProc(OrigEditWndProc, hWnd, message, wParam, lParam);
-    
+
 	case WM_RBUTTONDOWN:
 		SetFocus(hWnd);
 		return 0;
 	case WM_LBUTTONDOWN:
 		SetFocus(hWnd);
-    
+
 		return CallWindowProc(OrigEditWndProc, hWnd, message, wParam, lParam);
 	case WM_LBUTTONDBLCLK:
 		SetFocus(hWnd);
@@ -658,6 +940,23 @@ LRESULT CALLBACK EditWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
 			return OnKeyUp (hWnd, message, wParam, lParam);
 		case VK_DOWN:
 			return OnKeyDown (hWnd, message, wParam, lParam);
+		case VK_F1:
+			hint( 1 );
+			return CallWindowProc(OrigEditWndProc, hWnd, message, wParam, lParam);
+		case VK_F2:
+			hint( 2 );
+			return CallWindowProc(OrigEditWndProc, hWnd, message, wParam, lParam);
+		case VK_F3:
+			hint( 3 );
+			return CallWindowProc(OrigEditWndProc, hWnd, message, wParam, lParam);
+		case VK_F12:
+          if ( ! ( (GetAsyncKeyState (VK_CONTROL) & 0x8000)) ){
+			  hint( 12 );
+          }else{
+              PProServices->RunCmd("console.restart","","");
+              return 0;
+          }
+          return CallWindowProc(OrigEditWndProc, hWnd, message, wParam, lParam);
 		default:
        return OnKeyPressed(hWnd, message, wParam, lParam) ;
 			//return CallWindowProc(OrigEditWndProc, hWnd, message, wParam, lParam);
@@ -678,7 +977,7 @@ LRESULT CALLBACK EditWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
   			return CallWindowProc(OrigEditWndProc, hWnd, message, wParam, lParam);
   		}
     }
-    return CallWindowProc(OrigEditWndProc, hWnd, message, wParam, lParam); 
+    return CallWindowProc(OrigEditWndProc, hWnd, message, wParam, lParam);
 	default:
 		return CallWindowProc(OrigEditWndProc, hWnd, message, wParam, lParam);
 	}
@@ -688,11 +987,11 @@ LRESULT CALLBACK EditWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
 void WriteText (HWND hwnd, const unsigned char * text)
 {
 	int i;
-	int length = strlen (text); 
+	int length = strlen (text);
 	for (i = 0; i < length; i++)
 	{
 		SendMessage (hwnd, WM_CHAR, text[i], 0);
-	}  
+	}
 }
 
 //------------------------------------------------------------------------------
@@ -844,15 +1143,16 @@ BOOL IsKeyword (const unsigned char * name)
 //------------------------------------------------------------------------------
 unsigned char *	GetNextCommand ()
 {
-	int tmp;
-	if (line_num == line_num_for_next)
-	{
-		return NULL;
-	}
+	int tmp = line_num ;
 
-	tmp = IncreaseLineNum (line_num);
+  while(   tmp != line_num_for_next ){
+    tmp = IncreaseLineNum (tmp);
+    if ( previous_commands[tmp][0]  ){
+      break;
+    }
+  };
 
-	if (tmp == line_num_for_next || strcmp(previous_commands[tmp], "") == 0)
+	if (tmp == line_num_for_next )
 	{
 		return NULL;
 	}
@@ -866,9 +1166,11 @@ unsigned char *	GetNextCommand ()
 //------------------------------------------------------------------------------
 unsigned char *	GetPreviousCommand ()
 {
-	int tmp = DecreaseLineNum (line_num);
-
-	if (tmp == line_num_for_next || strcmp(previous_commands[tmp], "") == 0)
+	int tmp = line_num;
+  do{
+    tmp = DecreaseLineNum (tmp);
+  }while( previous_commands[tmp][0] == 0 && tmp != line_num_for_next );
+  if (tmp == line_num_for_next )
 	{
 		return NULL;
 	}
@@ -879,37 +1181,59 @@ unsigned char *	GetPreviousCommand ()
 	}
 }
 
-void history(){
+void chistory(){
   int i = 0;
   WriteText(hEdit,"**** History *****\n");
-  if ( line_count > PREVIOUS_COMMANDS_COUNT ){ 
+  if ( line_count > PREVIOUS_COMMANDS_COUNT ){
 	  for( i = line_num ; i < PREVIOUS_COMMANDS_COUNT ; i++){
-	     WriteText(hEdit,previous_commands[i]);
+       if ( previous_commands[i][0] ) {
+	       WriteText(hEdit,previous_commands[i]);
          WriteText(hEdit,"\n");
+       }
 	  }
-  } 	  
-  for( i = 0 ; i < line_num ; i++){
-	 WriteText(hEdit,previous_commands[i]);
-     WriteText(hEdit,"\n");
   }
+  for( i = 0 ; i < line_num -1 ; i++){
+       if ( previous_commands[i][0] ){
+	       WriteText(hEdit,previous_commands[i]);
+         WriteText(hEdit,"\n");
+       }
+  }
+}
+void cmddel( const unsigned char * cmd ){
+    unsigned char tmp[10];
+    for( int i = 0; i < PREVIOUS_COMMANDS_COUNT; i++ ){
+       if ( ! stricmp( cmd, previous_commands[i] ) ){
+         previous_commands[i][0] = 0;
+         sprintf(tmp,"H%02d",i);
+         WritePrivateProfileString(histPro,  tmp, "", iniFullName);
+         return;
+       }
+    }
 }
 //------------------------------------------------------------------------------
 void AddCommandToList (const unsigned char * cmd)
 {
 	if (strcmp (cmd, "") != 0)
 	{
+    cmddel(cmd);
 		strcpy (previous_commands[line_num_for_next], cmd);
+    char * strEnter = strtok(cmd,"\n");
+    unsigned char tmp[10];
+    sprintf(tmp,"H%02d",line_num_for_next);
+    WritePrivateProfileString(histPro,  tmp, cmd, iniFullName);
 		line_num_for_next = IncreaseLineNum (line_num_for_next);
+    WritePrivateProfileInt(histPro,  "next", line_num_for_next, iniFullName);
+    line_count ++ ;
 	}
 	line_num = line_num_for_next;
-    line_count ++ ;
+
 }
 
 //------------------------------------------------------------------------------
 int GetCaretPositionBySelection( )
 {
 	int sel_start;
-		
+
 	SendMessage( hEdit, EM_GETSEL, (WPARAM) &sel_start, 0 );
 	return sel_start;
 }
@@ -923,24 +1247,24 @@ int GetCaretPositionByGetCaretPos( )
 	if (!GetCaretPos (&point))
 	{
 		int sel_start;
-		
+
 		MoveCaretToEnd( );
 		SendMessage( hEdit, EM_GETSEL, (WPARAM) &sel_start, 0 );
 
-		return sel_start;		
+		return sel_start;
 	}
-	
+
 	// if caret is not visible then move it to the end and return that new position
 	if (point.x < 0 || point.y < 0)
 	{
 		int sel_start;
-		
+
 		MoveCaretToEnd( );
 		SendMessage( hEdit, EM_GETSEL, (WPARAM) &sel_start, 0 );
-		
+
 		return sel_start;
 	}
-		
+
 	return LOWORD( SendMessage( hEdit, EM_CHARFROMPOS, 0, MAKELPARAM( point.x, point.y ) ) );
 }
 
@@ -948,7 +1272,7 @@ int GetCaretPositionByGetCaretPos( )
 void MoveCaretToEnd( )
 {
 	LRESULT length;
-	
+
 	length = SendMessage( hEdit, WM_GETTEXTLENGTH, 0, 0 );
 	SendMessage( hEdit, EM_SETSEL, length, length );
 }
@@ -1001,14 +1325,14 @@ void DeleteCmdLine( )
 }
 //------------------------------------------------------------------------------
 LRESULT OnKeyPressed(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
-{ 
+{
     if ( awaiting_input == TRUE ){
-      int   current_pos  = GetCaretPositionByGetCaretPos() ; 
+      int   current_pos  = GetCaretPositionByGetCaretPos() ;
       if (  current_pos < cmd_line_start  ){
          if ( ! ( (GetAsyncKeyState (VK_CONTROL) & 0x8000)) ){
             MoveCaretToEnd();
          }
-      } 
+      }
     }
 	 return CallWindowProc(OrigEditWndProc, hWnd, message, wParam, lParam);
 }
@@ -1121,7 +1445,6 @@ LRESULT OnKeyLeft(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 LRESULT	OnKeyUp (HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
 	unsigned char * p = GetPreviousCommand();
-
 	if (p != NULL)
 	{
 		awaiting_input = FALSE;
@@ -1166,12 +1489,20 @@ LRESULT OnKeyEnter(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	WriteText (hWnd, "\n");
 
 	AddCommandToList (cmd_line);
-
+  cmd_result[0] = 0 ;
 	strcpy (tmp_cmd_line, cmd_line);
 	p = strtok (tmp_cmd_line, " ");
 	if (p != NULL)
 	{
-		if (_stricmp (p, "set") == 0)
+		if (_stricmp (p, "hint") == 0 ){
+        hint( 0 );
+		}else if (_stricmp (p, "global") == 0 ){
+			PProServices->RunCmd(cmd_line, NULL,cmd_result);
+				WriteText (hWnd, "Run Cmd : ");
+				WriteText (hWnd, cmd_line);
+				WriteText (hWnd, "\n");
+
+		}else if (_stricmp (p, "set") == 0)
 		{
 			p = strtok (NULL, " ");
 			if (p != NULL)
@@ -1182,19 +1513,7 @@ LRESULT OnKeyEnter(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 					p = strtok (NULL, "\0");
 					if (p != NULL)
 					{
-						WriteText (hWnd, "Setting variable:\n");
-						WriteText (hWnd, variable_name);
-						WriteText (hWnd, " = ");
-						WriteText (hWnd, p);
-						WriteText (hWnd, "  // (");
-            if ( PProServices->EvalExpr(p,cmd_result) ){
-						  PProServices->SetVar(variable_name, cmd_result); 
-						  WriteText (hWnd, cmd_result );
-            } else {  
-						  PProServices->SetVar(variable_name, p);
-						  WriteText (hWnd, "not evaluated !" );
-            }  
-						WriteText (hWnd, ")\n");
+          SetVAR(variable_name,p);
 					}
 					else
 					{
@@ -1225,7 +1544,7 @@ LRESULT OnKeyEnter(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		}
 		else if (_stricmp (p, "history") == 0)
 		{
-		   history();
+		   chistory();
 		}
 		else if (_stricmp (p, "won") == 0)
 		{
@@ -1275,11 +1594,27 @@ LRESULT OnKeyEnter(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		{
 			p = strtok (NULL, "\0");
 			SetWatch( 5, p );
-		}
-		else if (_stricmp (p, "flag") == 0)
+		}	else if (_stricmp (p, "Debug") == 0)
 		{
 			unsigned char buffer [600];
+      buffer[0] = 0;
+			p = strtok (NULL, "\0");
+      if ( p != NULL ){
+			    PProServices->SetDebug(p,NULL);
+      }
+			UINT db = PProServices->SetDebug("",NULL);
+      WriteText(hWnd,"Debug : " );
+      WriteText(hWnd,buffer );
+      if ( db ){
+      WriteText(hWnd,"on\n" );
+      }else{
+      WriteText(hWnd,"off\n" );
+      }
 
+
+		}else if (_stricmp (p, "flag") == 0)
+		{
+			unsigned char buffer [600];
 			sprintf (buffer, "*Script %s", cmd_line);
 			PProServices->RunCmd(buffer, "", "");
 		}
@@ -1327,25 +1662,48 @@ LRESULT OnKeyEnter(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				WriteText (hWnd, "Error: 'Get' needs one argument.\n");
 			}
 		}
-		else if ( TRUE == IsConsoleService (p) )
+		else if ( TRUE == IsConsoleUnsupportedService (p) )
 		{
 			WriteText (hWnd, "Error: This command is not supported.\n");
 		}
 		else
 		{
-			EnableWindow( hMainWnd, FALSE );
-			if (PProServices->EvalExpr(cmd_line, cmd_result) == TRUE)
-			{
-				WriteText (hWnd, "Result: ");
-				WriteText (hWnd, cmd_result);
-				WriteText (hWnd, "\n");
-			}
-			else
-			{
-				WriteText (hWnd, "Result: Evaluation error!\n");
-			}
-			EnableWindow( hMainWnd, TRUE );
-			SetForegroundWindow( hMainWnd );
+      unsigned char _var[64];
+      unsigned char _value[532];
+      const char *_error = NULL ;
+
+      _error = slre_match2( &re01 ,
+                      cmd_line, strlen(cmd_line),
+                      SLRE_STRING, 63, _var,
+                      SLRE_STRING, 531,_value );
+      if( _error == NULL ){
+  			EnableWindow( hMainWnd, FALSE );
+        SetVAR(_var, _value);
+  			EnableWindow( hMainWnd, TRUE );
+  			SetForegroundWindow( hMainWnd );
+      }else if (cmd_line[0] == '*' ){
+  			EnableWindow( hMainWnd, FALSE );
+  			PProServices->RunCmd(cmd_line, "","");
+        WriteText (hWnd, "RunCmd : ");
+  			WriteText (hWnd, cmd_line);
+  			WriteText (hWnd, "\n");
+  			EnableWindow( hMainWnd, TRUE );
+  			SetForegroundWindow( hMainWnd );
+      } else {
+  			EnableWindow( hMainWnd, FALSE );
+  			if (PProServices->EvalExpr(cmd_line, cmd_result) == TRUE)
+  			{
+  				WriteText (hWnd, "Result: ");
+  				WriteText (hWnd, cmd_result);
+  				WriteText (hWnd, "\n");
+  			}
+  			else
+  			{
+  				WriteText (hWnd, "Result: Evaluation error!\n");
+  			}
+  			EnableWindow( hMainWnd, TRUE );
+  			SetForegroundWindow( hMainWnd );
+      }
 		}
 	}
 
@@ -1355,7 +1713,19 @@ LRESULT OnKeyEnter(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	awaiting_input = TRUE;
 	return 0;
 }
-
+//------------------------------------------------------------------------------
+void SetVAR( unsigned char * varname, unsigned char * value ){
+  char _tmp[531];
+  _tmp[0] = 0;
+  strcpy(fullCmd,"global ");
+  strcat(fullCmd, varname);
+  strcat(fullCmd, " = ");
+  strcat(fullCmd, value);
+	WriteText (hEdit, "Setting variable:\n");
+	WriteText (hEdit, fullCmd );
+	WriteText (hEdit, "\n");
+  PProServices->RunCmd(fullCmd,"",_tmp);
+}
 //------------------------------------------------------------------------------
 void SetWatch( int watch_no, unsigned char * value )
 {
@@ -1415,24 +1785,90 @@ void DisableWatches ()
 //------------------------------------------------------------------------------
 BOOL IsConsoleService (const unsigned char * text)
 {
-	if (strlen (text) >= strlen ("console.execute") )
-		if  ( 0 == _memicmp (text, "console.execute", strlen("console.execute")) )
+  int len = strlen (text);
+  if ( len < 12 || len >15 ) 
+    return FALSE;
+     
+	if ( len == 15 )
+		if  ( 0 == _memicmp (text, "console.execute", 15) )
 			return TRUE;
-	if (strlen (text) >= strlen ("console.print") )
-		if  ( 0 == _memicmp (text, "console.print", strlen("console.print")) )
+	if ( len == 13 )
+		if  ( 0 == _memicmp (text, "console.print", 13) )
 			return TRUE;
-	if (strlen (text) >= strlen ("console.append") )
-		if  ( 0 == _memicmp (text, "console.append", strlen("console.append")) )
+	if (len == 14 )
+		if  ( 0 == _memicmp (text, "console.append", 14) )
 			return TRUE;
-	if (strlen (text) >= strlen ("console.show") )
-		if  ( 0 == _memicmp (text, "console.show", strlen("console.show")) )
+	if (len == 12 )
+		if  ( 0 == _memicmp (text, "console.show", 12) )
 			return TRUE;
-	if (strlen (text) >= strlen ("console.close") )
-		if  ( 0 == _memicmp (text, "console.close", strlen("console.close")) )
+	if (len == 13 )
+		if  ( 0 == _memicmp (text, "console.close", 13) )
 			return TRUE;
-	if (strlen (text) >= strlen ("console.unload") )
-		if  ( 0 == _memicmp (text, "console.unload", strlen("console.unload")) )
+	if (len == 14 ) 
+		if  ( 0 == _memicmp (text, "console.unload", 14) )
 			return TRUE;
+	if (len == 15 )
+		if  ( 0 == _memicmp (text, "console.history", 15) )
+			return TRUE;
+	if (len == 14 )
+		if  ( 0 == _memicmp (text, "console.handle", 14 ) )
+			return TRUE;
+	if (len == 15 )
+		if  ( 0 == _memicmp (text, "console.inifile", 15) )
+			return TRUE;
+	if (len == 15 )
+		if  ( 0 == _memicmp (text, "console.restart", 15) )
+			return TRUE;
+	if (len == 15 )
+		if  ( 0 == _memicmp (text, "console.version", 15) )
+			return TRUE;
+
+	return FALSE;
+}
+//------------------------------------------------------------------------------
+BOOL IsConsoleUnsupportedService (const unsigned char * text)
+{
+  int len = strlen (text);
+  if ( len < 12 || len >15 ) 
+    return FALSE;
+/*     
+	if ( len == 15 )
+		if  ( 0 == _memicmp (text, "console.execute", 15) )
+			return TRUE;
+	if ( len == 13 )
+		if  ( 0 == _memicmp (text, "console.print", 13) )
+			return TRUE;
+	if (len == 14 )
+		if  ( 0 == _memicmp (text, "console.append", 14) )
+			return TRUE;
+*/
+	if (len == 12 )
+		if  ( 0 == _memicmp (text, "console.show", 12) )
+			return TRUE;
+	if (len == 13 )
+		if  ( 0 == _memicmp (text, "console.close", 13) )
+			return TRUE;
+	if (len == 14 ) 
+		if  ( 0 == _memicmp (text, "console.unload", 14) )
+			return TRUE;
+	if (len == 15 )
+		if  ( 0 == _memicmp (text, "console.history", 15) )
+			return TRUE;
+
+  if (len == 15 )
+		if  ( 0 == _memicmp (text, "console.restart", 15) )
+			return TRUE;
+/*      
+	if (len == 14 )
+		if  ( 0 == _memicmp (text, "console.handle", 14 ) )
+			return TRUE;
+	if (len == 15 )
+		if  ( 0 == _memicmp (text, "console.inifile", 15) )
+			return TRUE;
+	if (len == 15 )
+		if  ( 0 == _memicmp (text, "console.version", 15) )
+			return TRUE;
+*/	
 
 	return FALSE;
 }
@@ -1499,20 +1935,27 @@ void FreeResources ()
 		watches = NULL;
 	}
   hMainWnd = NULL;
+  //OutputDebugStringA("Free Ressources");
 
 }
 
 //------------------------------------------------------------------------------
 void ErrorMessage( const unsigned char * message )
 {
-	MessageBox( NULL, message, "Console Plugin Error", MB_OK | MB_ICONERROR | MB_TASKMODAL	);
+  if ( PProServices ){
+     PProServices->ErrMessage(" Console plugin "  CONSOLE_VERSION "\n" ,(LPSTR) message);
+  }else{
+	   MessageBox( NULL, message, "Console Plugin Error", MB_OK | MB_ICONERROR | MB_TASKMODAL	);
+  }
 }
 
 //------------------------------------------------------------------------------
 BOOL SetDefaultSettings ()
 {
+  //OutputDebugStringA("SetDefaultSetting");
+
 	strcpy (prompt, default_prompt);
-  
+
 	strcpy (font_name, default_font);
 	font_size = 9;
 	font_bold = FALSE;
@@ -1530,26 +1973,58 @@ BOOL SetDefaultSettings ()
 
 	return TRUE;
 }
+//
+void hint(int mode ){
 
+  switch ( mode ){
+  case 1:
+     strcpy(fullCmd,"do(\"hh\",\"mk:@MSITStore:\\(pprofolder)PowerPro.chm::/html/functionsalpha.htm\")");
+     break;
+  case 2: 
+     strcpy(fullCmd,"console.append(filemenu(\"\\(pprofolder)pprofunctions.txt\"))");
+     break;
+  case 3:
+     strcpy(fullCmd,"setnextdialogpos(xcursor-200,ycursor-100,600,500,1)");
+     PProServices->EvalExpr(fullCmd,fullwatch);
+     strcpy(fullCmd,"console.append(pickstring(console.history,\"Console History\",2))" );
+     break;
+  case 12:
+     strcpy(fullCmd,"do(?\x05" );
+     strcat(fullCmd,iniFullName );
+     strcat(fullCmd,"\x05)" );
+     break;
+  default:
+     return  ;
+  }
+  PProServices->EvalExpr(fullCmd,fullwatch);
+}
 //------------------------------------------------------------------------------
 void help( )
 {
-	WriteText( hEdit , 
+	WriteText( hEdit ,
 	"***** help for Console Plugin " CONSOLE_VERSION " *****\n"
 	"  help    -> this help!\n\n"
 	"  history -> list previous commands\n\n"
+	"  debug flag?-> same as setdebug( flag)\n\n"
 	"  won x? -> show watched variables and pproflags refresshed every x seconds\n"
 	"  woff   -> hide watches window\n\n"
-	"  set var expr -> set variable Var. to expression Expr\n"
+	"  watch1 .. watch5 var? -> add/remove var on watch screen\n\n"
+	"  flag set/clear/revert n     -> set clear or revert pproflag(n)\n\n"
+	"  set var expr       -> set variable Var. to expression Expr\n"
+    "  global var = expr  -> same as above.\n"
+    "  var = expr         -> same as above.\n"
 	"  get var      -> get variable var\n"
-	"  Each variable can be used in expression and also with new notation calls\n"
-    );	
+ 	"  Each variable can be used in expression and also with new notation calls\n\n"
+    "  F1 Key    -> Show powerpro help\n"
+	"  F2 Key    -> Show filemenu of pprofunction.txt\n"
+    );
 }
 //------------------------------------------------------------------------------
 void WriteCopyrightNote( )
 {
-	WriteText( hEdit , "\n          Console Plugin " CONSOLE_VERSION 
-	                 "\n Copyright (C) 2003-2012 Artur Dorochowicz (Modified by NSP)\n\n");	
+	WriteText( hEdit , "\n          Console Plugin " CONSOLE_VERSION
+	                 "\n Copyright (C) 2003-2012 Artur Dorochowicz (Modified by NSP)\n\n");
+
 }
 
 //------------------------------------------------------------------------------
