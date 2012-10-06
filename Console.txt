@@ -1,6 +1,7 @@
-Console Plugin   version 1.0.3
+Console Plugin   version 1.0.5b
 
 Copyright (C) 2003-2004 Artur Dorochowicz
+              2012      fork NSP-0123456 
 All rights reserved.
 
 TABLE OF CONTENTS
@@ -19,9 +20,13 @@ TABLE OF CONTENTS
 --------------------------------------------------------------------------------
 Console  Plugin creates  a console  window where  user can  run other   plugins'
 services, see what they return, check and set variables and operate on flags.
-It can be a very helpful tool during plugin development.
+It can be a very helpful tool during plugin development. It can also be 
+considered as a mini powerpro Shell console. It can also be very helpful for 
+script creation / debug.
 
-The plugin has been tested with PowerPro versions: 3.8 and higher.
+
+The plugin has been tested with PowerPro versions: 3.8 and higher. 
+Version 1.04 is for powerpro above version 5.03
 
 2. LICENCE
 --------------------------------------------------------------------------------
@@ -36,6 +41,8 @@ Console Plugin consists of the following files:
    Console.dll   - plugin's dll file
    Console.txt   - this readme file
    Console.ini   - example configuration file 
+
+Default Console.ini file must be placed under pprofolder\plugins.
 
 Redistribution is fully allowed as long  as all of the above files  are included
 and remain  unchanged.
@@ -68,6 +75,9 @@ close ()
         a completely  new console  window: empty,  with no  watches set, with no
         information on previously used commands.
 
+restart ()
+        Closes the console window and recreate a new one.
+
 execute ("command")
         Executes "command" on the console.  Console  window will be opened if it
         is closed.  All double quote characters in  "command"  must  be preceded
@@ -86,6 +96,19 @@ append ("command")
         quote characters in "command"  must be preceded  by an escape  character,
         e.g. console.append("win.handle('"PowerPro*'")")
 
+history()
+        Returns a string whith the history all command are separated by \n.
+        
+handle()
+        Returns the current console handle.
+        
+inifile()
+        Return a string with the current ini file.
+
+        
+version()
+        Return a string with the current plugin version.
+
 Services that  do not  take any  arguments,  can  also be used without brackets.
 
 5. CONFIGURATION FILE FORMAT
@@ -96,29 +119,51 @@ treated as a comment. Section names must be put in square brackets.
 
 In the current version the file can have these sections and settings:
 FontSettings - section
-   Name - name of the font, it  must be put in double quotes
+   Name  - name of the font, it  must be put in double quotes
    Size  - size of the font
-   Bold - 1 - bold font, 0 - normal font
+   Bold  - 1 - bold font, 0 - normal font
+
+   # dedicated font for the watches window
+   WName - name of the font, it  must be put in double quotes
+   WSize - size of the font
+   WBold - 1 - bold font, 0 - normal font
+
    
 Appearance - section
    Prompt - string used as prompt, it must be put in double quotes
    CopyrightNote - controls showing copyright note, 0 - do not show, 1 - show
    Height - height of console window
    Width - width of console window
-   Resizable - controls whether the window is resizable, 0 - not resizable, 1 - resizable
+   Resizable - controls whether the window is resizable, 0 - not , 1 - resizable
    Left - initial vertical position of the window
    Top - initial horizontal position of the window
+   
+   RememberPos - Write back position and size of window
+   Transparency - set transparency (-1 no transparency, 0 = opaque 255 invisible
+   PopupWindow -  1 : for small titlebar and small button / 0 : Regular window
+
+History - section (This section is automatically rewritten at each execution !)
+   next - position to use for writing next command 0..29
+   H00 to H30 history line
 
 For every setting  which is not  present in the  configuration file, the  plugin
-uses its  hardcoded default   value. Hence there  is  no  need to include  every
+uses its  hardcoded default  value. Hence there  is  no  need to include  every
 setting in the ini file.
+
+Default setting for show without ini parameter is taken from ?'\(pprofolder)\plugins\console.ini
+
+Appearance.PProProcessName and History.PProProcessName are dedicated sections for each 
+secondary process.
+( Position and history will be saved using proces name as a KEY.)
 
 6. PLUGIN USAGE
 --------------------------------------------------------------------------------
 When the console is shown, the following commands can be used:
 
 exit
-        Closes console window. Works like close() service.
+        Closes console window. Works like close() service. 
+debug
+       Call setDebug( string) and print debug status        
 
 set
         Sets the value of the variable.
@@ -169,6 +214,27 @@ won
 woff
         Turnes watches off.
 
+help
+        Show a minimal help.
+
+history
+        Show history of command.
+
+F1 KEY  
+        Show Powerpro Help with alphabetical list of function.
+
+F2 KEY
+        ShowFilmenu pprofolder\pprofunction.twt
+
+F3 KEY  
+        Show Powerpro pickString with console history inside.
+
+F12 KEY  
+        Open the current ini file.
+        
+[ctrl]+F12 KEY  
+        Restarts the console   
+        
 All other commands are send to PowerPro for evaluation.
 Through evaluation you can do the following:
 
@@ -194,8 +260,19 @@ THIS!  It may crash PowerPro!
 
 7. HISTORY
 --------------------------------------------------------------------------------
+v. 1.0.5   ( 2012 10 05 )
+    - dedicated ini sections for powerpro secondary processes.
+    - added version service
+   - few minor bugs fixed
+      
+v. 1.0.4   ( 2012 08 09 )
+    - ini file is saved with position when the windows is closed.
+    - added transparency
+    - added *XXX and global variable setting (using RunCmd)
+    - added debug command
+      
 v. 1.0.3   (6 March 2004)
-   - 'show' service changed, it can now read settings from ini file
+   - show service changed, it can now read settings from ini file
    - console window is now customizable
    - few minor bugs fixed
 
