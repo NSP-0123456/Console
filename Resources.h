@@ -12,4 +12,5 @@
 #define IDB_MINIMIZE 1010
 #define IDB_TITLE_BAR 1020
 
+#define IDM_ICO  8001
 #endif

@@ -1,48 +1,51 @@
-/*
-  Console Plugin
-
-  Copyright (C) 2003-2004 Artur Dorochowicz
-  All Rights Reserved.
-*/
+// SCRIPT DE RESOURCE construit par "Pelles C pour Windows, version 7.00".
 
 #include <windows.h>
-
+#include <commctrl.h>
+#include <richedit.h>
 #include "resources.h"
 #include "version.h"
 
-IDB_CLOSE	BITMAP "close.bmp"
-IDB_MINIMIZE	BITMAP "minimize.bmp"
-IDB_TITLE_BAR	BITMAP "title_bar.bmp"
+LANGUAGE LANG_ENGLISH,SUBLANG_ENGLISH_US
 
-// English (U.K.) resources
-#ifdef _WIN32
-LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_UK
-#endif
+IDB_CLOSE BITMAP "close.bmp"
+
+IDB_MINIMIZE BITMAP "minimize.bmp"
+
+IDB_TITLE_BAR BITMAP "title_bar.bmp"
+
+LANGUAGE LANG_ENGLISH,SUBLANG_ENGLISH_UK
 
 VS_VERSION_INFO VERSIONINFO
-FILEVERSION     CONSOLE_MAJOR_VERSION,CONSOLE_MINOR_VERSION,CONSOLE_REVISION,0
-PRODUCTVERSION  CONSOLE_MAJOR_VERSION,CONSOLE_MINOR_VERSION,CONSOLE_REVISION,0
-FILEFLAGSMASK   VS_FFI_FILEFLAGSMASK
-FILEOS          VOS__WINDOWS32
-FILETYPE        VFT_DLL
-FILESUBTYPE     VFT2_UNKNOWN
-BEGIN
+FILEVERSION 1,0,5,0
+PRODUCTVERSION 1,0,5,0
+FILEFLAGSMASK 0x3F
+FILEFLAGS 0x0
+FILEOS VOS__WINDOWS32
+FILETYPE VFT_DLL
+FILESUBTYPE VFT2_UNKNOWN
+{
   BLOCK "StringFileInfo"
-  BEGIN
-    BLOCK "080904b0"
-    BEGIN
-      VALUE "CompanyName",      "x-phile"
-      VALUE "FileDescription",  "Console Plugin"
-      VALUE "FileVersion",      CONSOLE_VERSION
-      VALUE "InternalName",     "Console Plugin"
-      VALUE "LegalCopyright",   "Copyright © 2003-2004 Artur Dorochowicz (2012 NSP fork)"    
-      VALUE "OriginalFilename", "Console.dll"
-      VALUE "ProductName",      "Console Plugin"
-      VALUE "ProductVersion",   CONSOLE_VERSION
-    END
-  END
+  {
+    BLOCK "080904B0"
+    {
+      VALUE "CompanyName", "x-phile\0"
+      VALUE "FileDescription", "Console Plugin\0"
+      VALUE "FileVersion", "1.0.5b\0"
+      VALUE "InternalName", "Console Plugin\0"
+      VALUE "LegalCopyright", "Copyright © 2003-2004 Artur Dorochowicz (2012 NSP fork)\0"
+      VALUE "OriginalFilename", "Console.dll\0"
+      VALUE "ProductName", "Console Plugin\0"
+      VALUE "ProductVersion", "1.0.5c\0"
+    }
+  }
   BLOCK "VarFileInfo"
-  BEGIN
-    VALUE "Translation", 0x809, 0x4b0
-  END
-END
+  {
+    VALUE "Translation", 0x809, 0x4B0
+  }
+}
+
+LANGUAGE LANG_FRENCH,SUBLANG_FRENCH
+
+IDM_ICO ICON "x.ico"
+

@@ -127,9 +127,13 @@ PPROSERVICES * PProServices = NULL;
 
 BOOL	awaiting_input;			// true if waiting for user input
 BOOL	watches_enabled;		// true if watches are enabled
+
 HBITMAP	hbTitleBar = NULL;		// bitmap for title bar
 HBITMAP hbClose = NULL;			// handle of bitmap on close button
 HBITMAP hbMinimize = NULL;		// handle of bitmap on minimize button
+
+HICON   hMainIcon = NULL;
+
 HBRUSH	title_bar_brush = NULL;	// brush for filling the title bar
 HFONT	hFont = NULL;			// font handle for edit control
 HFONT	hWFont = NULL;			// font handle for edit control
@@ -150,6 +154,7 @@ unsigned char ** watches = NULL;			// stores variables to check
 WNDPROC	OrigEditWndProc;		// original window procedure of edit control
 //
 struct slre re01;
+    //You can also prepare second, smaller (16x16) icon - it looks better in title bar. 
 
 // settings
 unsigned char prompt[50];
@@ -265,7 +270,7 @@ void doclose(){
 	UnregisterClass(wnd_class_name, instance);
     hMainWnd = NULL;
 }
-//------------------------------------------------------------------------------
+
 
 //------------------------------------------------------------------------------
 __declspec(dllexport) void show (LPSTR szv, LPSTR szx, BOOL (*GetVar)(LPSTR, LPSTR), void (*SetVar)(LPSTR, LPSTR), DWORD * pFlags, UINT nargs, LPSTR * szargs, PPROSERVICES * ppsv)
@@ -273,12 +278,12 @@ __declspec(dllexport) void show (LPSTR szv, LPSTR szx, BOOL (*GetVar)(LPSTR, LPS
 	WNDCLASS wc;
 	HDC hdc;
 	HWND oldhWnd = hMainWnd;
-
+    WINDOWPLACEMENT *lpwp ;
+	// char debug[128];
 	// return nothing
 	**szargs = '\0';
 
 	PProServices = ppsv;
-  //OutputDebugStringA("CALL SHOW");
 
 
 	// need 1 or 0 arguments
@@ -293,8 +298,16 @@ __declspec(dllexport) void show (LPSTR szv, LPSTR szx, BOOL (*GetVar)(LPSTR, LPS
     }
 	// if window exists - exit
 	//oldhWnd = FindWindow( wnd_class_name, NULL );
-	if (oldhWnd != NULL)
+	if (oldhWnd != NULL){
+		GetWindowPlacement(oldhWnd, lpwp);
+		//sprintf(debug,"ShowCmd-> %i",lpwp->showCmd);
+		//ErrorMessage(debug);
+		if ( lpwp->showCmd ==  SW_HIDE ||  lpwp->showCmd == 2){
+			lpwp->showCmd = SW_RESTORE;
+            SetWindowPlacement(oldhWnd, lpwp); 
+		}
 		return;
+	}
 
   re01.options = SLRE_CASE_INSENSITIVE;
   compile2(&re01,"^\\s*([abcdefghijklmnopqrstuvwxyz_0123456789]+)\\s*=\\s*(.*)$");
@@ -316,7 +329,8 @@ __declspec(dllexport) void show (LPSTR szv, LPSTR szx, BOOL (*GetVar)(LPSTR, LPS
 	line_num_for_next = 0;
 	buffer_size = 100000;
   //OutputDebugStringA(pproName);
-
+	//load Icon
+    hMainIcon = LoadIcon(instance, MAKEINTRESOURCE (IDM_ICO));
 	// load bitmaps
 	hbClose = LoadBitmap (instance, MAKEINTRESOURCE (IDB_CLOSE));
 	hbMinimize = LoadBitmap (instance, MAKEINTRESOURCE (IDB_MINIMIZE));
@@ -449,7 +463,7 @@ __declspec(dllexport) void show (LPSTR szv, LPSTR szx, BOOL (*GetVar)(LPSTR, LPS
 	wc.cbClsExtra = 0;
 	wc.cbWndExtra = 0;
 	wc.hInstance = instance;
-	wc.hIcon = LoadIcon( NULL, IDI_APPLICATION );
+	wc.hIcon = hMainIcon ;
 	wc.hCursor = LoadCursor( NULL, IDC_ARROW );
 	wc.hbrBackground = CreateSolidBrush( MAIN_WND_BK_COLOR );
 	wc.lpszMenuName = NULL;
@@ -535,6 +549,45 @@ __declspec(dllexport) void show (LPSTR szv, LPSTR szx, BOOL (*GetVar)(LPSTR, LPS
 	UpdateWindow(hMainWnd);
 
 }
+
+//------------------------------------------------------------------------------
+__declspec(dllexport) void swing(LPSTR szv, LPSTR szx, BOOL (*GetVar)(LPSTR, LPSTR), void (*SetVar)(LPSTR, LPSTR), DWORD * pFlags, UINT nargs, LPSTR * szargs, PPROSERVICES * ppsv){
+	HWND oldhWnd = hMainWnd;
+    WINDOWPLACEMENT *lpwp ;
+	if (oldhWnd != NULL){
+		GetWindowPlacement(oldhWnd, lpwp);
+	    //char debug[128];
+		//sprintf(debug,"ShowCmd-> %i",lpwp->showCmd);
+		//ErrorMessage(debug);
+		if ( lpwp->showCmd ==  SW_HIDE ||  lpwp->showCmd == 2 ){
+			lpwp->showCmd = SW_RESTORE;
+            SetWindowPlacement(oldhWnd, lpwp); 
+		}else{
+			lpwp->showCmd = SW_MINIMIZE;
+            SetWindowPlacement(oldhWnd, lpwp); 
+		}
+	}else{
+		show(szv,szx,SetVar,GetVar,pFlags,nargs,szargs,ppsv);
+	}
+}
+
+__declspec(dllexport) void minimize (LPSTR szv, LPSTR szx, BOOL (*GetVar)(LPSTR, LPSTR), void (*SetVar)(LPSTR, LPSTR), DWORD * pFlags, UINT nargs, LPSTR * szargs, PPROSERVICES * ppsv){
+	HWND oldhWnd = hMainWnd;
+    WINDOWPLACEMENT *lpwp ;
+	if (oldhWnd != NULL){
+		GetWindowPlacement(oldhWnd, lpwp);
+	    //char debug[128];
+		//sprintf(debug,"ShowCmd-> %i",lpwp->showCmd);
+		//ErrorMessage(debug);
+		if ( lpwp->showCmd != 2 ){
+			lpwp->showCmd = SW_MINIMIZE;
+            SetWindowPlacement(oldhWnd, lpwp); 
+		}
+	}
+
+}
+
+
 __declspec(dllexport) void handle(LPSTR szv, LPSTR szx, BOOL (*GetVar)(LPSTR, LPSTR),
 									void (*SetVar)(LPSTR, LPSTR), DWORD* pFlags,
 									UINT nargs, LPSTR* szargs, PPROSERVICES* ppsv){
@@ -555,7 +608,7 @@ __declspec(dllexport) void version(LPSTR szv, LPSTR szx, BOOL (*GetVar)(LPSTR, L
 									void (*SetVar)(LPSTR, LPSTR), DWORD* pFlags,
 									UINT nargs, LPSTR* szargs, PPROSERVICES* ppsv){
 
-		(ppsv->ReturnString)( consoleVersion ,szargs);
+		(ppsv->ReturnString)( (char *)consoleVersion ,szargs);
 }
 
 __declspec(dllexport) void restart(LPSTR szv, LPSTR szx, BOOL (*GetVar)(LPSTR, LPSTR),
@@ -1217,7 +1270,7 @@ void AddCommandToList (const unsigned char * cmd)
 	{
     cmddel(cmd);
 		strcpy (previous_commands[line_num_for_next], cmd);
-    char * strEnter = strtok(cmd,"\n");
+    char * strEnter = strtok((char *)cmd,"\n");
     unsigned char tmp[10];
     sprintf(tmp,"H%02d",line_num_for_next);
     WritePrivateProfileString(histPro,  tmp, cmd, iniFullName);
@@ -1491,7 +1544,7 @@ LRESULT OnKeyEnter(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	AddCommandToList (cmd_line);
   cmd_result[0] = 0 ;
 	strcpy (tmp_cmd_line, cmd_line);
-	p = strtok (tmp_cmd_line, " ");
+	p = strtok (tmp_cmd_line, " \t");
 	if (p != NULL)
 	{
 		if (_stricmp (p, "hint") == 0 ){
@@ -1504,7 +1557,7 @@ LRESULT OnKeyEnter(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
 		}else if (_stricmp (p, "set") == 0)
 		{
-			p = strtok (NULL, " ");
+			p = strtok (NULL, " \t");
 			if (p != NULL)
 			{
 				if (strlen(p) <= MAX_VAR_LENGTH)
@@ -1548,7 +1601,7 @@ LRESULT OnKeyEnter(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		}
 		else if (_stricmp (p, "won") == 0)
 		{
-			p = strtok (NULL, " ");
+			p = strtok (NULL, " \t");
 			if (p != NULL)
 			{
 				int interval = (int) strtod (p, NULL);
@@ -1594,24 +1647,23 @@ LRESULT OnKeyEnter(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		{
 			p = strtok (NULL, "\0");
 			SetWatch( 5, p );
-		}	else if (_stricmp (p, "Debug") == 0)
+		}	
+		else if (_stricmp (p, "Debug") == 0) 
 		{
 			unsigned char buffer [600];
-      buffer[0] = 0;
+            buffer[0] = 0;
 			p = strtok (NULL, "\0");
-      if ( p != NULL ){
+            if ( p != NULL ){
 			    PProServices->SetDebug(p,NULL);
-      }
+             }
 			UINT db = PProServices->SetDebug("",NULL);
-      WriteText(hWnd,"Debug : " );
-      WriteText(hWnd,buffer );
-      if ( db ){
-      WriteText(hWnd,"on\n" );
-      }else{
-      WriteText(hWnd,"off\n" );
-      }
-
-
+		      WriteText(hWnd,"Debug : " );
+		      WriteText(hWnd,buffer );
+            if ( db ){
+                WriteText(hWnd,"on\n" );
+            }else{
+               WriteText(hWnd,"off\n" );
+            }
 		}else if (_stricmp (p, "flag") == 0)
 		{
 			unsigned char buffer [600];
@@ -1626,7 +1678,7 @@ LRESULT OnKeyEnter(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		}
 		else if (_stricmp (p, "get") == 0)
 		{
-			p = strtok (NULL, " ");
+			p = strtok (NULL, " \t");
 			if (p != NULL)
 			{
 				if (strlen(p) <= MAX_VAR_LENGTH)
@@ -1661,8 +1713,22 @@ LRESULT OnKeyEnter(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			{
 				WriteText (hWnd, "Error: 'Get' needs one argument.\n");
 			}
-		}
-		else if ( TRUE == IsConsoleUnsupportedService (p) )
+		} 
+		else if (_stricmp (p, "!") == 0){
+             p=strtok (NULL, " \t");
+			if ( p != NULL ){
+			  strcpy(cmd_line,p);
+			  p=strtok (NULL, " \t");	 
+			  while(   p ){
+			   strcat(cmd_result,p);
+			   strcat(cmd_result," ");
+               p=strtok (NULL, " \t");   
+		    }
+			PProServices->RunCmd(cmd_line,cmd_result,"");
+	        }
+
+	   }
+	   else if ( TRUE == IsConsoleUnsupportedService (p) )
 		{
 			WriteText (hWnd, "Error: This command is not supported.\n");
 		}

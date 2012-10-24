@@ -9,9 +9,9 @@
 #ifndef VERSION_H
 #define VERSION_H
 
-#define CONSOLE_VERSION "1.0.4"
+#define CONSOLE_VERSION "1.0.5c"
 #define CONSOLE_MAJOR_VERSION 1
 #define CONSOLE_MINOR_VERSION 0
-#define CONSOLE_REVISION 4
+#define CONSOLE_REVISION 5
 
 #endif
