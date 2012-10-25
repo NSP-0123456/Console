@@ -73,10 +73,10 @@ minimize minimize console window.
 
 swing("path_to_ini_file")
         if console is created:
-		    minimize console if visible
-			restore console if minimized
+		      minimize console if visible
+			    restore console and bring to front if minimized
         if console is not created:
-		    create and show console like using show() service
+		      create and show console like using show() service
 
 
 close ()
@@ -276,6 +276,7 @@ THIS!  It may crash PowerPro!
 v. 1.0.5c  ( 2012 10 25 )
     - added minimize and swing  services
     - added ! prefix to simplify do calls.
+    - bugfix saving position if unload is done when windows is minimized
 
 v. 1.0.5   ( 2012 10 05 )
     - dedicated ini sections for powerpro secondary processes.

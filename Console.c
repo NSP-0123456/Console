@@ -219,8 +219,6 @@ void SetVAR( unsigned char * varname, unsigned char * value );
 
 //---DEFINITIONS----------------------------------------------------------------
 
-
-
 void FAR PASCAL WritePrivateProfileInt (LPCSTR lpszSection, LPCSTR lpszEntry, int Value, LPCSTR lpszFilename)
 {
    char szConverted [20];
@@ -256,15 +254,6 @@ void doclose(){
 	HWND oldhWnd = hMainWnd;
 	if (oldhWnd)
 	{
-    if ( wnd_remember == 1 ){
-      RECT rc;
-      if ( GetWindowRect( hMainWnd, &rc ) ) {
-        WritePrivateProfileInt(appPro,  "Height",rc.bottom - rc.top, iniFullName);
-    	  WritePrivateProfileInt(appPro,  "Width",rc.right - rc.left, iniFullName);
-    	  WritePrivateProfileInt(appPro,  "Left",rc.left, iniFullName);
-    	  WritePrivateProfileInt(appPro,  "Top",rc.top, iniFullName);
-      }
-    }
 		DestroyWindow(oldhWnd);
 	}
 	UnregisterClass(wnd_class_name, instance);
@@ -303,8 +292,9 @@ __declspec(dllexport) void show (LPSTR szv, LPSTR szx, BOOL (*GetVar)(LPSTR, LPS
 		//sprintf(debug,"ShowCmd-> %i",lpwp->showCmd);
 		//ErrorMessage(debug);
 		if ( lpwp->showCmd ==  SW_HIDE ||  lpwp->showCmd == 2){
-			lpwp->showCmd = SW_RESTORE;
-            SetWindowPlacement(oldhWnd, lpwp); 
+            ShowWindow(oldhWnd, SW_SHOWNORMAL);
+			SetActiveWindow(oldhWnd);
+            SetForegroundWindow(oldhWnd);
 		}
 		return;
 	}
@@ -500,7 +490,7 @@ __declspec(dllexport) void show (LPSTR szv, LPSTR szx, BOOL (*GetVar)(LPSTR, LPS
 		return;
 	}
 	// create Watch font
-	hWFont = CreateFont( -MulDiv(wfont_size, GetDeviceCaps(hdc, LOGPIXELSY), 72),	// logical height of font
+	        hWFont = CreateFont( -MulDiv(wfont_size, GetDeviceCaps(hdc, LOGPIXELSY), 72),	// logical height of font
 			0,					// logical average character width
 			0,					// angle of escapement
 			0,					// base-line orientation angle
@@ -560,8 +550,9 @@ __declspec(dllexport) void swing(LPSTR szv, LPSTR szx, BOOL (*GetVar)(LPSTR, LPS
 		//sprintf(debug,"ShowCmd-> %i",lpwp->showCmd);
 		//ErrorMessage(debug);
 		if ( lpwp->showCmd ==  SW_HIDE ||  lpwp->showCmd == 2 ){
-			lpwp->showCmd = SW_RESTORE;
-            SetWindowPlacement(oldhWnd, lpwp); 
+            ShowWindow(oldhWnd, SW_SHOWNORMAL);
+			SetActiveWindow(oldhWnd);
+            SetForegroundWindow(oldhWnd);
 		}else{
 			lpwp->showCmd = SW_MINIMIZE;
             SetWindowPlacement(oldhWnd, lpwp); 
@@ -856,30 +847,25 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
 	}
 	case WM_CLOSE:
-    if ( wnd_remember == 1 ){
-      RECT rc;
-      GetWindowRect( hMainWnd, &rc );
-      WritePrivateProfileInt("Appearance",  "Height",rc.bottom - rc.top, iniFullName);
-  	  WritePrivateProfileInt("Appearance",  "Width",rc.right - rc.left, iniFullName);
-  	  WritePrivateProfileInt("Appearance",  "Left",rc.left, iniFullName);
-  	  WritePrivateProfileInt("Appearance",  "Top",rc.top, iniFullName);
-    }
+	    if ( wnd_remember == 1 ){
+	      WINDOWPLACEMENT *lpwp ;
+	      if ( GetWindowPlacement(hMainWnd, lpwp)  ) {
+			  if ( lpwp->showCmd == SW_SHOWNORMAL ) {
+				  GetWindowRect(hMainWnd,&lpwp->rcNormalPosition );
+			  }
+	          WritePrivateProfileInt(appPro,  "Height",lpwp->rcNormalPosition.bottom - lpwp->rcNormalPosition.top, iniFullName);
+	    	  WritePrivateProfileInt(appPro,  "Width",lpwp->rcNormalPosition.right - lpwp->rcNormalPosition.left, iniFullName);
+	    	  WritePrivateProfileInt(appPro,  "Left",lpwp->rcNormalPosition.left, iniFullName);
+	    	  WritePrivateProfileInt(appPro,  "Top",lpwp->rcNormalPosition.top, iniFullName);
+	      }
+	    }
 		DestroyWindow (hWnd);
 		UnregisterClass (wnd_class_name, instance);
-    hMainWnd = NULL;
+        hMainWnd = NULL;
 		return 0;
 	case WM_DESTROY:
 		SetWindowLong(hEdit, GWL_WNDPROC, (LONG) OrigEditWndProc);
 		KillTimer (hMainWnd, IDT_TIMER);
-    if ( wnd_remember == 1 ){
-      RECT rc;
-      if ( GetWindowRect( hMainWnd, &rc ) ){
-        WritePrivateProfileInt("Appearance",  "Height",rc.bottom - rc.top, iniFullName);
-    	  WritePrivateProfileInt("Appearance",  "Width",rc.right - rc.left, iniFullName);
-    	  WritePrivateProfileInt("Appearance",  "Left",rc.left, iniFullName);
-    	  WritePrivateProfileInt("Appearance",  "Top",rc.top, iniFullName);
-      }
-    }
 		FreeResources ();
 		return 0;
 	case WM_NCHITTEST:
